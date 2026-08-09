@@ -1,4 +1,4 @@
-# Proyecto IngSoft3 - versión A
+# Proyecto IngSoft3 - versión B
 
 > **Ingeniería en Sistemas · 4to año** — Cátedra práctica: DevOps de punta a punta, sobre una aplicación tuya.
 > Docente: Ing. Ariel Schwindt
