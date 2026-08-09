@@ -129,3 +129,10 @@ La IA es una herramienta de productividad, no un reemplazo del entendimiento. Co
 ---
 
 *Los servicios gratuitos citados en las guías se re-verifican antes de cada cohorte ([smoke test de vigencia](smoke-test-vigencia.md) — documento operativo de la cátedra, público por transparencia). Si encontrás que alguno cambió sus condiciones, avisá a la cátedra — es exactamente el tipo de ojo profesional que esta materia entrena.*
+
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+## Instalación
+
+git clone <url-del-repo>
