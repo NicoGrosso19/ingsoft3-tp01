@@ -1,20 +1,21 @@
 # Registro de Decisiones de Arquitectura y DevOps (decisiones.md)
 
 ## 1. Selección de la Aplicación y Stack Tecnológico
-* **Fecha:** 2026-08-06
-* **Decisión tomada:** Selección del **Sistema de Gestión de Reservas y Turnos** compuesto por Frontend SPA (React + Vite), Backend API REST (Node.js + Express) y Base de Datos Relacional (PostgreSQL).
-* **Alternativas consideradas:** Se evaluó un e-commerce completo con pasarela de pagos. Se descartó por requerir dependencias exóticas y servicios de terceros que comprometen la compilación en los runners de CI/CD (violando `elegir-app.md`).
+* **Fecha:** 2026-08-06 (Actualizado 2026-08-16)
+* **Decisión tomada:** Selección del **Sistema de Gestión de Reservas y Turnos** compuesto por Frontend SPA (React + Vite), Backend API REST (**ASP.NET Core .NET 8 Web API en C#**) y Base de Datos Relacional (PostgreSQL).
+* **Alternativas consideradas:** Se evaluó un e-commerce completo con pasarela de pagos. Se descartó por requerir dependencias exóticas y servicios de terceros que comprometen la compilación en los runners de CI/CD (violando `elegir-app.md`). Inicialmente se había planteado un prototipo en Node.js, pero se migró a **.NET 8** para alineación total con el repositorio de referencia y demostración de la cátedra (`ingsoft3ucc/demo-fullstack`).
 * **Justificación Técnica:**
-  - **Arquitectura Reducida:** 2 a 3 pantallas que garantizan compilaciones e imágenes Docker livianas y rápidas.
+  - **Alineación con la Cátedra:** Mismo stack canónico de demostración (`.NET 8 + React/Vite + PostgreSQL`).
+  - **Arquitectura Reducida:** 2 a 3 pantallas que garantizan compilaciones e imágenes Docker multi-stage livianas y rápidas.
   - **Cero Dependencias Exóticas:** Sin Redis, Kafka ni APIs pagas propensas a vencer.
-  - **Desacoplamiento de BD:** La conexión en `src/db.js` utiliza el driver `pg` parametrizado mediante variables de entorno (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`) sin valores hardcodeados, permitiendo apuntar a Docker local en TP2 y a QA/PROD en TP6/TP7[cite: 1, 2].
+  - **Desacoplamiento de BD:** La conexión en `Services/ReservationService.cs` utiliza el driver `Npgsql` parametrizado mediante variables de entorno (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`) sin valores hardcodeados, permitiendo apuntar a Docker local en TP2 y a QA/PROD en TP6/TP7.
 * **Verificación de Criterios y Testing (`elegir-app.md`):**
-  - **Compilación/Ejecución Backend:** `npm run build` / `npm start`[cite: 2]
-  - **Compilación Frontend:** `npm run build`[cite: 2]
-  - **Lógica para TP5:** Incluye 6 reglas de negocio explícitas en backend (R1: intervalos 30min/futuro, R2: validación e-mail/nombre, R3: bloqueo de solapamiento, R4: inmutabilidad de estado cancelado, R5: ventana límite cancelación >2hs, R6: máximo 3 turnos activos/día por usuario) y 3 comportamientos en frontend (deshabilitación de submit, badges de estado y filtro interactivo)[cite: 2].
+  - **Compilación/Ejecución Backend:** `dotnet build` / `dotnet run --project Trabajo/backend/SistemaReservasBackend.csproj`
+  - **Compilación Frontend:** `npm run build`
+  - **Lógica para TP5:** Incluye 6 reglas de negocio explícitas en backend (R1: intervalos 30min/futuro, R2: validación e-mail/nombre, R3: bloqueo de solapamiento, R4: inmutabilidad de estado cancelado, R5: ventana límite cancelación >2hs, R6: máximo 3 turnos activos/día por usuario) y 3 comportamientos en frontend (deshabilitación de submit, badges de estado y filtro interactivo).
 * **Declaración de Asistencia de IA (Política Sección 6):**
-  - **Uso de IA:** Se utilizó Gemini y Antigravity para estructurar la selección y desglosar las reglas de negocio exigidas.
-  - **Verificación:** Se auditó manualmente el código del controlador `reservationController.js` y `db.js`, confirmando la ausencia de credenciales hardcodeadas[cite: 1, 2].
+  - **Uso de IA:** Se utilizó Gemini y Antigravity para migrar la API a .NET 8 C# y estructurar la selección.
+  - **Verificación:** Se auditó manualmente el código del controlador `ReservationsController.cs` y `ReservationService.cs`, confirmando la ausencia de credenciales hardcodeadas y la compatibilidad estricta con el Frontend en React.
 
 
 ----------------------------------------------------------------------------------------------
