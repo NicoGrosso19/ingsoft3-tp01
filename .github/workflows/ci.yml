@@ -16,11 +16,11 @@ jobs:
         run: echo "Rama $RAMA · commit $GITHUB_SHA"
 
       - name: Bajar el código al runner
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Construir la imagen del backend
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@v5
         with:
-          context: ./backend          # ajustá a donde esté TU Dockerfile
+          context: ./Trabajo/backend          
           push: false                 # todavía no publicamos la imagen en ningún lado
           tags: backend:ci            # el nombre de la imagen (hoy sólo vive dentro del runner)
