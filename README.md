@@ -136,5 +136,4 @@ La IA es una herramienta de productividad, no un reemplazo del entendimiento. Co
 ## Instalación
 
 git clone <url-del-repo>
- 
- 
+<!-- avance de main -->
