@@ -2,11 +2,12 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]      # ← el que hace el trabajo: verifica ANTES del merge
+    branches: [main]
   push:
-    branches: [main]      # ← sólo para que main tenga su corrida (la que lee el badge, §3.5)
+    branches: [main]
 
 jobs:
+  # Job 1: Compilar Backend
   build-backend:
     runs-on: ubuntu-latest
     steps:
@@ -21,6 +22,30 @@ jobs:
       - name: Construir la imagen del backend
         uses: docker/build-push-action@v5
         with:
-          context: ./Trabajo/backend          
-          push: false                 # todavía no publicamos la imagen en ningún lado
-          tags: backend:ci            # el nombre de la imagen (hoy sólo vive dentro del runner)
+          context: ./Trabajo/backend      # ← Tu ruta real
+          push: false
+          tags: backend:ci
+
+  # Job 2: Compilar Frontend (se agrega aquí abajo al mismo nivel de indentación)
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Qué estamos verificando
+        env:
+          RAMA: ${{ github.head_ref || github.ref_name }}
+        run: echo "Rama $RAMA · commit $GITHUB_SHA"
+
+      - name: Bajar el código al runner
+        uses: actions/checkout@v4
+
+      - name: Preparar el constructor que sabe cachear
+        uses: docker/setup-buildx-action@v3
+
+      - name: Construir la imagen del frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./Trabajo/frontend     # ← Tu ruta real
+          push: false
+          tags: frontend:ci
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
