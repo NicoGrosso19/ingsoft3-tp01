@@ -1,5 +1,7 @@
 # Proyecto IngSoft3 - versión B
 
+[![CI](https://github.com/NicoGrosso19/ingsoft3-tp01/actions/workflows/ci.yml/badge.svg)](https://github.com/NicoGrosso19/ingsoft3-tp01/actions/workflows/ci.yml)
+
 > **Ingeniería en Sistemas · 4to año** — Cátedra práctica: DevOps de punta a punta, sobre una aplicación tuya.
 > Docente: Ing. Ariel Schwindt
 
