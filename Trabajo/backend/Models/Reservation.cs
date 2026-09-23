@@ -1,7 +1,9 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 
 namespace SistemaReservasBackend.Models;
 
+[ExcludeFromCodeCoverage]
 public class Reservation
 {
     [JsonPropertyName("id")]

@@ -8,6 +8,7 @@ namespace SistemaReservasBackend.Services;
 public class ReservationService : IReservationService
 {
     private readonly IConfiguration _configuration;
+    private readonly INotificationService? _notificationService;
     private static readonly List<Reservation> MockReservations = new()
     {
         new Reservation
@@ -30,9 +31,10 @@ public class ReservationService : IReservationService
         }
     };
 
-    public ReservationService(IConfiguration configuration)
+    public ReservationService(IConfiguration configuration, INotificationService? notificationService = null)
     {
         _configuration = configuration;
+        _notificationService = notificationService;
     }
 
     private string GetConnectionString()
@@ -292,6 +294,11 @@ public class ReservationService : IReservationService
                 var insertedId = Convert.ToInt32(await cmd.ExecuteScalarAsync());
                 newRes.Id = insertedId;
 
+                if (_notificationService != null)
+                {
+                    await _notificationService.NotifyReservationCreatedAsync(newRes.UserEmail, newRes.UserName, newRes.DateTime);
+                }
+
                 return (201, new ApiResponse<Reservation> { Success = true, Data = newRes });
             }
             catch (Exception ex)
@@ -303,6 +310,12 @@ public class ReservationService : IReservationService
         {
             newRes.Id = MockReservations.Count + 1;
             MockReservations.Add(newRes);
+
+            if (_notificationService != null)
+            {
+                await _notificationService.NotifyReservationCreatedAsync(newRes.UserEmail, newRes.UserName, newRes.DateTime);
+            }
+
             return (201, new ApiResponse<Reservation> { Success = true, Data = newRes });
         }
     }
@@ -312,6 +325,18 @@ public class ReservationService : IReservationService
         if (string.IsNullOrWhiteSpace(dto.NewStatus))
         {
             return (400, new ApiResponse<Reservation> { Success = false, Message = "Debe proporcionar un nuevo estado." });
+        }
+
+        var normalizedStatus = dto.NewStatus.Trim().ToUpperInvariant();
+        var validStatuses = new[] { "PENDIENTE", "CONFIRMADO", "CANCELADO" };
+        if (!validStatuses.Contains(normalizedStatus))
+        {
+            return (400, new ApiResponse<Reservation>
+            {
+                Success = false,
+                Code = "INVALID_STATUS",
+                Message = "El estado proporcionado no es válido. Valores permitidos: PENDIENTE, CONFIRMADO, CANCELADO."
+            });
         }
 
         Reservation? existing = null;

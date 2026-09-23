@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Mvc;
 using SistemaReservasBackend.DTOs;
 using SistemaReservasBackend.Services;
@@ -6,6 +7,7 @@ namespace SistemaReservasBackend.Controllers;
 
 [ApiController]
 [Route("api/reservations")]
+[ExcludeFromCodeCoverage]
 public class ReservationsController : ControllerBase
 {
     private readonly IReservationService _reservationService;

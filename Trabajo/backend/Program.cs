@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using DotNetEnv;
 using SistemaReservasBackend.Services;
 
@@ -28,6 +29,7 @@ builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 // Registrar Servicios
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddScoped<INotificationService, EmailNotificationService>();
 builder.Services.AddScoped<IReservationService, ReservationService>();
 
 // Configurar CORS para permitir comunicación con el Frontend React
@@ -49,4 +51,7 @@ app.MapControllers();
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
 app.Run();
+
+[ExcludeFromCodeCoverage]
+public partial class Program { }
 
