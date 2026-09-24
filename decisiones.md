@@ -134,3 +134,73 @@ Los contenedores se ejecutan dentro de una red interna tipo *bridge* gestionada 
 ### 5. Declaración de Uso de Inteligencia Artificial
 * **Uso de IA:** Se utilizó asistencia de IA para estructurar la sintaxis YAML del workflow `.github/workflows/ci.yml` y configurar los parámetros de Buildx y caché GHA.
 * **Verificación humana:** Se provocó deliberadamente un fallo para verificar el bloqueo del PR en rojo, se aplicó la corrección, se validó el paso a verde en la pestaña Actions y se integró el badge de estado en el `README.md`.
+
+---
+
+## ## TP5 — Calidad Automatizada: Tests, Coverage y Quality Gates
+
+### 1. Lógica elegida para testear y Justificación
+* **Backend (.NET 8):** Se cubrieron las 6 reglas de negocio críticas del sistema de reservas (`ReservationService.cs`), donde un fallo impacta directamente en la integridad operativa:
+  - **R1 (Fecha futura e intervalos exactos de 30 min):** Evita turnos en el pasado o en minutos no estándar (ej. 10:17).
+  - **R2 (Validación de nombre y email con Regex):** Garantiza que todo turno posea contacto válido.
+  - **R3 (Prevención de solapamiento de horarios):** Evita colisiones de turnos activos para el mismo horario exacto (código HTTP 409).
+  - **R4 (Inmutabilidad de cancelaciones):** Bloquea cualquier reactivación de un turno cancelado.
+  - **R5 (Ventana límite de cancelación >2hs):** Impide cancelaciones de último momento.
+  - **R6 (Máximo 3 turnos activos diarios por usuario):** Evita acaparamiento de turnos.
+* **Frontend (React/Vite):** Se extrajo la lógica pura a `src/lib/reservas.js` (validación de datos, filtrado de reservas activas y cálculo de prioridad y descuentos según anticipación), permitiendo pruebas unitarias deterministas sin tocar DOM ni red.
+
+### 2. Umbrales de Cobertura (Thresholds), Métricas y Justificación
+* **Frontend:** Umbral establecido en **80% de líneas y 80% de ramas** en `vite.config.js`.
+  - **Medición real lograda:** **91.3% de líneas** y **80.76% de ramas**.
+  - **Justificación:** Al aislar la lógica en `src/lib/**`, el 80% es un estándar exigible que garantiza que casi todas las bifurcaciones condicionales (`if`, validaciones de formato) estén cubiertas sin pedir números ficticios.
+* **Backend:** Umbral establecido en **50% de líneas** (`/p:Threshold=50 /p:ThresholdType=line` en `coverlet.msbuild`).
+  - **Medición real lograda:** **56.21% de líneas**, **37.7% de ramas** y **84.61% de métodos**.
+  - **Justificación:** El umbral se ancla en la medición real de la lógica ejecutada en memoria. Las ramas de persistencia SQL de bajo nivel a PostgreSQL caen en el bloque de fallback durante pruebas unitarias (se probarán end-to-end con la base de datos viva en el TP7). Un umbral de 50% garantiza que cualquier regresión en la lógica de validación frene el build.
+
+### 3. Exclusiones de Cobertura y Justificación
+Se excluyeron de la medición aquellas piezas sin lógica de negocio propia mediante el atributo `[ExcludeFromCodeCoverage]` y filtros de `ReportGenerator`:
+* **`Program.cs` (Arranque):** Código de cableado, middleware y configuración del servidor web.
+* **Modelos y DTOs (`Models/`, `DTOs/`):** Estructuras de datos anémicas que solo contienen propiedades auto-implementadas (`get; set;`).
+* **Controladores (`ReservationsController.cs`):** Capa delgada de transporte HTTP que solo delega al servicio y retorna códigos de estado.
+* **Servicio de Notificación Real (`EmailNotificationService.cs`):** Infraestructura de salida externa reemplazada por Mocks en pruebas unitarias.
+
+### 4. ¿Por qué Coverage alto no garantiza Calidad? (Ejemplo y Mutantes)
+* **La trampa de la métrica:** La cobertura mide **qué líneas se ejecutaron**, pero no si los tests comprueban el comportamiento esperado (*ejecución $\neq$ verificación*).
+* **Ejemplo conceptual:**
+  ```csharp
+  [Fact]
+  public void TestEnganoso() {
+      var service = new ReservationService(_config);
+      service.CreateReservationAsync(dto); // 100% de cobertura de líneas ejecutadas... ¡CERO Asserts!
+  }
+  ```
+* **Mutantes (Mutation Testing):** Introducir un cambio deliberado en el código fuente (ej. cambiar `horasDiferencia < 2` por `horasDiferencia <= 2`). Si todos los tests siguen en verde, el mutante *sobrevivió*, demostrando que la suite tiene cobertura de ejecución pero no verifica el caso de borde.
+
+### 5. Ejercicio de la Rama de Código sin Cubrir
+* **Línea identificada en ReportGenerator:** `ReservationService.cs: línea 384` (`if (timeDifference < TimeSpan.FromHours(2))`).
+* **Entrada que la recorre:** Una reserva con fecha exactamente a 1 hora del momento actual (`DateTime.UtcNow.AddHours(1)`).
+* **Decisión tomada:** Se agregó el test unitario específico `ActualizarEstado_CancelarConMenosDeDosHoras_FallaReglaR5` para recorrer y verificar la rama verdadera del `if`, protegiendo la regla de negocio que bloquea cancelaciones con menos de 2 horas de anticipación.
+
+### 6. Refactorización para Inyección de Dependencias y Mocks
+* **Problema inicial:** `ReservationService` no podía testear notificaciones sin intentar enviar correos reales.
+* **Refactor aplicado:**
+  1. Se extrajo la interfaz `INotificationService` con el método `NotifyReservationCreatedAsync(...)`.
+  2. `ReservationService` ahora **recibe** `INotificationService` en su constructor.
+  3. En `Program.cs` se registró `builder.Services.AddScoped<INotificationService, EmailNotificationService>()`.
+* **Prueba con Mock (`Moq` en C# y `vi.fn()` en JS):**
+  - **Backend (Moq):** Se verificó que al crear una reserva válida se invoque el notificador exactamente una vez:
+    `mockNotifier.Verify(n => n.NotifyReservationCreatedAsync(...), Times.Once);`
+  - **Frontend (Vitest):** En `reservas.test.js`, se mockeó el cliente HTTP mediante `vi.fn()` y se verificó `expect(mockTraer).toHaveBeenCalledWith(...)`.
+
+### 7. Demostración del Quality Gate y Enlaces de Evidencia
+
+| Evidencia requerida | Descripción del Logro | Enlace de Verificación |
+|---|---|---|
+| **Corrida Inicial Roja por Umbral** | Job `build-frontend` fallando por no alcanzar el umbral del 80% al subir código sin tests (`calcularPrioridadReserva`). | [Ver Run #35936517964](https://github.com/NicoGrosso19/ingsoft3-tp01/actions/runs/35936517964) |
+| **Pull Request #1 (Mergeado)** | Secuencia completa: PR abierto $\to$ Fallo de Quality Gate en rojo $\to$ Agregado de tests $\to$ Paso a verde $\to$ Merge a `main`. | [Ver Pull Request #20](https://github.com/NicoGrosso19/ingsoft3-tp01/pull/20) |
+| **Pull Request #2 (Abierto y en Rojo)** | PR chiquito con función `calcularDescuentoPorAnticipacion` sin tests, mantenido abierto en rojo para la defensa oral. | [Ver Pull Request #21](https://github.com/NicoGrosso19/ingsoft3-tp01/pull/21) |
+
+### 8. Declaración de Uso de Inteligencia Artificial
+* **Uso de IA:** Se utilizó asistencia de IA (Antigravity / Gemini) para estructurar los proyectos de prueba xUnit y Vitest, diseñar las matrices de casos parametrizados de las reglas R1 a R6, y configurar los reporters de cobertura en GitHub Actions.
+* **Verificación humana:** Se ejecutaron los tests localmente, se comprobaron las salidas visuales de ReportGenerator en navegador, se auditó el bloqueo efectivo del botón de merge en los Pull Requests de GitHub y se validó el pase a verde tras la incorporación de los tests faltantes.
+
