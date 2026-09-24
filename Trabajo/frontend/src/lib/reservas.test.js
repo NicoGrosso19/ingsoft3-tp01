@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { validarReserva, filtrarReservasActivas, obtenerReservasDeUsuario } from './reservas.js';
+import { validarReserva, filtrarReservasActivas, obtenerReservasDeUsuario, calcularPrioridadReserva } from './reservas.js';
 
 describe('validarReserva - Lógica Pura (AAA)', () => {
   const ahoraFija = new Date('2026-09-23T12:00:00.000Z');
@@ -95,5 +95,39 @@ describe('obtenerReservasDeUsuario - Test con MOCK (vi.fn)', () => {
 
     // Comprobamos que el cliente HTTP haya sido invocado con la URL exacta esperada
     expect(mockTraer).toHaveBeenCalledWith('/api/reservations?email=laura%40test.com');
+  });
+});
+
+describe('calcularPrioridadReserva - Tests para recuperar cobertura', () => {
+  const ahora = new Date('2026-09-23T12:00:00.000Z');
+
+  it('devuelve SIN_FECHA si no se pasa string de fecha', () => {
+    expect(calcularPrioridadReserva('', ahora)).toBe('SIN_FECHA');
+    expect(calcularPrioridadReserva(null, ahora)).toBe('SIN_FECHA');
+  });
+
+  it('devuelve VENCIDA si la fecha es anterior a ahora', () => {
+    const fechaPasada = '2026-09-23T10:00:00.000Z';
+    expect(calcularPrioridadReserva(fechaPasada, ahora)).toBe('VENCIDA');
+  });
+
+  it('devuelve URGENTE si faltan 4 horas o menos', () => {
+    const fechaUrgente = '2026-09-23T15:00:00.000Z'; // 3 horas de diferencia
+    expect(calcularPrioridadReserva(fechaUrgente, ahora)).toBe('URGENTE');
+  });
+
+  it('devuelve ALTA si faltan entre 4 y 24 horas', () => {
+    const fechaAlta = '2026-09-24T06:00:00.000Z'; // 18 horas
+    expect(calcularPrioridadReserva(fechaAlta, ahora)).toBe('ALTA');
+  });
+
+  it('devuelve MEDIA si faltan entre 24 y 72 horas', () => {
+    const fechaMedia = '2026-09-25T12:00:00.000Z'; // 48 horas
+    expect(calcularPrioridadReserva(fechaMedia, ahora)).toBe('MEDIA');
+  });
+
+  it('devuelve NORMAL si faltan más de 72 horas', () => {
+    const fechaNormal = '2026-09-30T12:00:00.000Z'; // 7 días
+    expect(calcularPrioridadReserva(fechaNormal, ahora)).toBe('NORMAL');
   });
 });
