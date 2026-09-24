@@ -79,3 +79,24 @@ export function calcularPrioridadReserva(dateTimeStr, ahora = new Date()) {
   return 'NORMAL';
 }
 
+/**
+ * Calcula un porcentaje de descuento según días de anticipación de la reserva.
+ * (Función nueva SIN tests para mantener el PR #2 abierto en rojo para la defensa)
+ */
+export function calcularDescuentoPorAnticipacion(diasAnticipacion, esClienteFrecuente = false) {
+  if (diasAnticipacion <= 0) {
+    return 0;
+  }
+  if (diasAnticipacion >= 30) {
+    return esClienteFrecuente ? 25 : 20;
+  }
+  if (diasAnticipacion >= 15) {
+    return esClienteFrecuente ? 15 : 10;
+  }
+  if (diasAnticipacion >= 7) {
+    return esClienteFrecuente ? 10 : 5;
+  }
+  return esClienteFrecuente ? 5 : 0;
+}
+
+
