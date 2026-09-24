@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  # Job 1: Compilar Backend
+  # Job 1: Compilar y Testear Backend
   build-backend:
     runs-on: ubuntu-latest
     steps:
@@ -19,14 +19,53 @@ jobs:
       - name: Bajar el código al runner
         uses: actions/checkout@v4
 
+      - name: Preparar el constructor que sabe cachear
+        uses: docker/setup-buildx-action@v3
+
       - name: Construir la imagen del backend
         uses: docker/build-push-action@v5
         with:
-          context: ./Trabajo/backend      # ← Tu ruta real
+          context: ./Trabajo/backend
           push: false
           tags: backend:ci
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
 
-  # Job 2: Compilar Frontend (se agrega aquí abajo al mismo nivel de indentación)
+      - name: Construir la etapa de tests
+        uses: docker/build-push-action@v5
+        with:
+          context: ./Trabajo/backend
+          target: test
+          load: true
+          push: false
+          tags: backend-test:ci
+          cache-from: type=gha,scope=backend-test
+          cache-to: type=gha,mode=max,scope=backend-test
+
+      - name: Correr los tests con coverage
+        run: |
+          docker run --rm -v "${{ github.workspace }}/TestResults:/out" backend-test:ci \
+            --collect:"XPlat Code Coverage"
+
+      - name: Reporte de coverage
+        if: ${{ !cancelled() }}
+        run: |
+          dotnet tool install -g dotnet-reportgenerator-globaltool
+          reportgenerator -reports:"TestResults/*/coverage.cobertura.xml" -sourcedirs:Trabajo/backend \
+            -targetdir:coveragereport "-reporttypes:Html;MarkdownSummaryGithub" \
+            "-classfilters:-Program*;-SistemaReservasBackend.Models.*;-SistemaReservasBackend.DTOs.*"
+          cat coveragereport/SummaryGithub.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Publicar coverage y resultados
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: coverage-report
+          path: |
+            coveragereport
+            TestResults/tests.trx
+
+  # Job 2: Compilar y Testear Frontend
   build-frontend:
     runs-on: ubuntu-latest
     steps:
@@ -44,8 +83,45 @@ jobs:
       - name: Construir la imagen del frontend
         uses: docker/build-push-action@v5
         with:
-          context: ./Trabajo/frontend     # ← Tu ruta real
+          context: ./Trabajo/frontend
           push: false
           tags: frontend:ci
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
+
+      - name: Construir la etapa de tests del frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./Trabajo/frontend
+          target: test
+          load: true
+          push: false
+          tags: frontend-test:ci
+          cache-from: type=gha,scope=frontend-test
+          cache-to: type=gha,mode=max,scope=frontend-test
+
+      - name: Correr los tests del frontend con coverage
+        run: |
+          docker run --rm -e COVERAGE_DIR=/salida/reporte \
+            -v "${{ github.workspace }}/frontend-coverage:/salida" frontend-test:ci
+
+      - name: Resumen del coverage del frontend
+        if: ${{ !cancelled() }}
+        run: |
+          F=frontend-coverage/reporte/coverage-summary.json
+          test -f "$F"
+          node -e "
+            const t = require('./$F').total;
+            if (!t.lines.total) { console.error('midio 0 archivos: revisa el include'); process.exit(1); }
+            const f = (m) => \`| \${m} | \${t[m].pct}% |\`;
+            console.log('### Coverage del frontend');
+            console.log('| métrica | % |'); console.log('|---|---|');
+            console.log(f('lines')); console.log(f('branches')); console.log(f('functions'));
+          " >> $GITHUB_STEP_SUMMARY
+
+      - name: Publicar el coverage del frontend
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: coverage-frontend
+          path: frontend-coverage

@@ -1,4 +1,4 @@
-# Proyecto IngSoft3 - versión B
+# Proyecto IngSoft3 - versión B - Parte de prueba
 
 [![CI](https://github.com/NicoGrosso19/ingsoft3-tp01/actions/workflows/ci.yml/badge.svg)](https://github.com/NicoGrosso19/ingsoft3-tp01/actions/workflows/ci.yml)
 

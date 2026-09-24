@@ -1,7 +1,9 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 
 namespace SistemaReservasBackend.DTOs;
 
+[ExcludeFromCodeCoverage]
 public class CreateReservationDto
 {
     [JsonPropertyName("userName")]
@@ -14,12 +16,14 @@ public class CreateReservationDto
     public string? DateTime { get; set; }
 }
 
+[ExcludeFromCodeCoverage]
 public class UpdateStatusDto
 {
     [JsonPropertyName("newStatus")]
     public string? NewStatus { get; set; }
 }
 
+[ExcludeFromCodeCoverage]
 public class ApiResponse<T>
 {
     [JsonPropertyName("success")]
