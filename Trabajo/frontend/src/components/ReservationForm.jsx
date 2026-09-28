@@ -37,7 +37,7 @@ export default function ReservationForm({ onReservationCreated }) {
     setServerMessage(null);
 
     try {
-      const response = await fetch('http://localhost:3000/api/reservations', {
+      const response = await fetch('/api/reservations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userName, userEmail, dateTime })
@@ -60,7 +60,7 @@ export default function ReservationForm({ onReservationCreated }) {
     } catch (err) {
       setServerMessage({
         type: 'error',
-        text: 'No se pudo conectar con el servidor backend (http://localhost:3000).'
+        text: 'No se pudo conectar con el servidor backend.'
       });
     } finally {
       setIsSubmitting(false);
