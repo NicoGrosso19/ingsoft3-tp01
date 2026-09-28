@@ -8,7 +8,7 @@ export default function App() {
 
   const fetchReservations = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/reservations');
+      const response = await fetch('/api/reservations');
       const data = await response.json();
       if (data.success && Array.isArray(data.data)) {
         setReservations(data.data);
@@ -31,8 +31,8 @@ export default function App() {
   return (
     <div className="container">
       <header className="header">
-        <h1>Sistema de Reservas y Turnos</h1>
-        <p>Gestión inteligente y validada de turnos con arquitectura Full-Stack</p>
+        <h1>Sistema de Reservas y Turnos (v6.0.0)</h1>
+        <p>Gestión inteligente y validada de turnos — Desplegado con CD Automatizado</p>
       </header>
 
       <main className="main-grid">
