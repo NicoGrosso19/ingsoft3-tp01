@@ -6,12 +6,14 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-# ---- Etapa 2: tests (parte del build: ya tiene Node y las dependencias) ----
+# ---- Etapa 2: tests ----
 FROM build AS test
 ENTRYPOINT ["npm", "run", "test:ci"]
 
-# ---- Etapa 3: nginx sirve los estáticos (queda ÚLTIMA) ----
+# ---- Etapa 3: nginx sirve los estáticos ----
 FROM nginx:alpine
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY default.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
+ENV BACKEND_URL=http://backend:8080 \
+    DNS_RESOLVER=127.0.0.11
 EXPOSE 80
