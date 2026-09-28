@@ -204,3 +204,116 @@ Se excluyeron de la medición aquellas piezas sin lógica de negocio propia medi
 * **Uso de IA:** Se utilizó asistencia de IA (Antigravity / Gemini) para estructurar los proyectos de prueba xUnit y Vitest, diseñar las matrices de casos parametrizados de las reglas R1 a R6, y configurar los reporters de cobertura en GitHub Actions.
 * **Verificación humana:** Se ejecutaron los tests localmente, se comprobaron las salidas visuales de ReportGenerator en navegador, se auditó el bloqueo efectivo del botón de merge en los Pull Requests de GitHub y se validó el pase a verde tras la incorporación de los tests faltantes.
 
+
+
+---
+
+## ## TP6 — Entrega Continua (CD): Environments, Aprobaciones y Deployment Patterns
+
+### 1. Enlaces de este TP (Entregables Obligatorios)
+
+| Recurso | Descripción | Enlace de Verificación |
+|---|---|---|
+| **Paquete Backend en GHCR** | Imagen de backend en GitHub Packages (Pública, etiquetada con commit SHA) | [ghcr.io/nicogrosso19/ingsoft3-tp01-backend](https://github.com/NicoGrosso19/ingsoft3-tp01/pkgs/container/ingsoft3-tp01-backend) |
+| **Paquete Frontend en GHCR** | Imagen de frontend en GitHub Packages (Pública, etiquetada con commit SHA) | [ghcr.io/nicogrosso19/ingsoft3-tp01-frontend](https://github.com/NicoGrosso19/ingsoft3-tp01/pkgs/container/ingsoft3-tp01-frontend) |
+| **Cadena Eslabón 1: PR con tests OK y Registry salteado** | Corrida de PR donde los tests pasan en verde pero «Entrar al registry» y la publicación se **saltean** | [Ver Run #36422786621 (Job Backend)](https://github.com/NicoGrosso19/ingsoft3-tp01/actions/runs/36422786621/job/108929341987?pr=23) |
+| **Cadena Eslabón 2: Corrida en Main con publicación al final** | Corrida en `main` donde «Construir y publicar la imagen» es el **último paso** post-tests | [Ver Run #36426021696 (Job Backend)](https://github.com/NicoGrosso19/ingsoft3-tp01/actions/runs/36426021696/job/108939768652) |
+| **API QA (Render + Neon)** | Backend en entorno QA conectado a base de datos `app_qa` | [https://ingsoft3-tp01-api-qa-new.onrender.com](https://ingsoft3-tp01-api-qa-new.onrender.com) |
+| **Frontend QA (Render)** | Frontend en entorno QA con Nginx configurado dinámicamente | [https://ingsoft3-tp01-front-qa.onrender.com](https://ingsoft3-tp01-front-qa.onrender.com) |
+| **API PROD (Render + Neon)** | Backend en entorno Producción conectado a base de datos `app_prod` | [https://ingsoft3-tp01-api-prod.onrender.com](https://ingsoft3-tp01-api-prod.onrender.com) |
+| **Frontend PROD (Render)** | Frontend en entorno Producción (Versión v6.0.0 visible) | [https://ingsoft3-tp01-front-prod.onrender.com](https://ingsoft3-tp01-front-prod.onrender.com) |
+| **Gate Humano: Corrida Rechazada** | Corrida con despliegue a PROD rechazado manualmente con motivo escrito | [Ver Run Rechazado #36440863748](https://github.com/NicoGrosso19/ingsoft3-tp01/actions/runs/36440863748) |
+| **Gate Humano: Corrida Aprobada** | Corrida con despliegue a PROD aprobado y smoke test en verde | [Ver Run Aprobado #36445891650](https://github.com/NicoGrosso19/ingsoft3-tp01/actions/runs/36445891650) |
+| **Release de Cierre v6.0.0** | Release formal del práctico en GitHub con changelog autogenerado | [Release v6.0.0](https://github.com/NicoGrosso19/ingsoft3-tp01/releases/tag/v6.0.0) |
+
+---
+
+### 2. El Artefacto y la Cadena de Confianza del Registry
+* **El principio:** *«Un pipeline que no produce artefacto no es integración continua: es compilación»*. El registry no debe ser un depósito ciego de imágenes construidas en cualquier momento, sino un catálogo inmutable de software **verificado y listo para desplegar**.
+* **La cadena de 3 eslabones:**
+  1. **Nada entra a `main` sin el pipeline en verde:** Garantizado por las protecciones de rama y los quality gates del TP4 y TP5.
+  2. **Sólo lo que entra a `main` se publica:** Condicionado explícitamente en el paso mediante `push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}`. Los Pull Requests construyen y testean, pero no suben paquetes al registry.
+  3. **Publicar es el ÚLTIMO paso del job de testing:** En `.github/workflows/ci.yml`, el paso de construir y publicar se ubicó estrictamente después de `docker run` de tests y el reporte de cobertura. Dado que GitHub Actions corta la ejecución ante el primer fallo, si los tests fallan el paso de publicación jamás llega a ejecutarse.
+* **Etiquetado determinista:** Cada imagen se publica bajo el tag `:sha-${{ github.sha }}`, permitiendo la trazabilidad biunívoca entre la imagen binaria en ejecución y el commit exacto que la originó.
+
+---
+
+### 3. Continuous Delivery vs. Continuous Deployment
+* **Enfoque Implementado:** **Continuous Delivery**.
+* **Justificación:**
+  - En Continuous Delivery, todo cambio validado se despliega de forma **100% automática al entorno de QA**, pero la promoción a **Producción requiere una aprobación humana explícita** (*Gate*).
+  - Continuous Deployment elimina el gate humano, desplegando directo a producción tras pasar los tests. Esto requiere una suite de tests end-to-end exhaustiva y observabilidad en tiempo real (canary deployments automatizados con rollback por métricas).
+  - En nuestro contexto, Continuous Delivery es la opción profesional adecuada: permite a los stakeholders y al equipo validar la estabilidad del sistema en QA, verificar ventanas de mantenimiento y tomar la decisión de negocio de cuándo impactar en los usuarios finales.
+
+---
+
+### 4. Arquitectura de Entornos y Aislamiento de Secretos
+* **Environments de GitHub (`qa` y `production`):**
+  - **`qa`:** Entorno sin reglas de protección. Ejecuta inmediatamente al mergear en `main`.
+  - **`production`:** Entorno protegido con **Required Reviewers**. El job `deploy-prod` queda en estado *Waiting* hasta la aprobación manual.
+* **Alcance de Secretos (Environment Secrets):**
+  - Los Deploy Hooks de Producción (`RENDER_HOOK_API_PROD` y `RENDER_HOOK_FRONT_PROD`) están confinados exclusivamente dentro del environment `production`. Ningún job no autorizado ni ejecución en QA puede leerlos ni interactuar con la infraestructura productiva.
+* **Aislamiento de Datos:**
+  - Se crearon dos bases de datos independientes en Neon PostgreSQL: `app_qa` y `app_prod`. Los servicios de QA y PROD no comparten datos bajo ninguna circunstancia.
+
+---
+
+### 5. Desacoplamiento de Configuración: Nginx Dinámico
+* **El problema:** Si la URL del backend se quema (*hardcodea*) durante el `npm run build` de React, la misma imagen no puede reutilizarse en múltiples entornos sin recompilar.
+* **La solución implementada:**
+  - Se reemplazó el archivo estático `nginx.conf` por una plantilla `default.conf.template` en `/etc/nginx/templates/`.
+  - El frontend realiza todas las peticiones a la ruta relativa `/api/...` (mismo origen).
+  - Al arrancar el contenedor Nginx, el entrypoint nativo procesa las variables de entorno `${BACKEND_URL}` y `${DNS_RESOLVER}` inyectadas por Render (`https://ingsoft3-tp01-api-qa-new.onrender.com` en QA y `https://ingsoft3-tp01-api-prod.onrender.com` en PROD).
+  - Esto garantiza que **la misma imagen binaria sirve idéntica para QA y PROD**, habilitando el despliegue desacoplado.
+
+---
+
+### 6. Letra Chica de los Free Tiers y Manejo en el Pipeline
+* **Condiciones de Render y Neon:**
+  - **Render Free Tier:** 750 horas de cómputo por workspace al mes. Los servicios entran en suspensión (*sleep*) tras 15 minutos de inactividad, sufriendo un *cold start* de hasta 50 segundos en la primera petición.
+  - **Neon Free Tier:** Suspende el cómputo tras 5 minutos de inactividad y cuenta con 0.5 GB de almacenamiento.
+* **Diseño del Smoke Test:**
+  - Un `curl` simple fallaría por timeout durante el arranque en frío.
+  - Se implementó un bucle de sondeo con hasta **30 intentos espaciados cada 20 segundos** (`--max-time 10`), tolerando hasta 10 minutos de tiempo de construcción y cold start.
+  - El smoke test valida tres puntos de falla críticos: `/health` (proceso vivo), `/api/reservations` (conexión a la base de datos operativa) y `/` (frontend servido por Nginx).
+
+---
+
+### 7. Estrategia de Despliegue en Producción Real y Medición de Rollback
+
+#### A. Patrón de Despliegue para Producción Real: **Blue-Green Deployment**
+* **Elección:** Para el Sistema de Reservas y Turnos, la estrategia recomendada en un entorno de producción empresarial es **Blue-Green Deployment**.
+* **Justificación:**
+  - En un sistema transaccional de turnos, el despliegue *Recreate* (downtime) provocaría pérdidas de reservas en curso.
+  - En *Rolling Update*, conviven dos versiones simultáneas, lo cual puede generar inconsistencias si hay cambios en los DTOs o en las validaciones de turnos.
+  - **Blue-Green** mantiene dos entornos idénticos (Azul y Verde). La nueva versión se despliega y valida completamente en Verde sin tráfico de usuarios. Una vez verificado el smoke test, el router/balanceador conmuta el 100% del tráfico de forma instantánea.
+  - **Rollback instantáneo:** Si surge un problema crítico no detectado, el balanceador redirige inmediatamente el tráfico de vuelta al entorno Azul (tiempo de rollback: < 5 segundos).
+* **Observabilidad faltante actual:** Para implementar Canary o Blue-Green avanzado se requiere instrumentación de métricas de latencia p95/p99, tasas de error HTTP 5xx y trazabilidad distribuida (objetivo del TP9).
+
+#### B. Plan de Rollback Actual y Medición Real en Render
+* **Plan de Acción ante Fallo Crítico en Producción:**
+  1. Identificar el commit de la versión estable anterior desde GitHub Actions o Deployments (`SHA_ANTERIOR`).
+  2. Disparar los Deploy Hooks de Producción de Render pasando explícitamente la referencia al commit previo:
+     ```bash
+     curl -fsS "$RENDER_HOOK_API_PROD&ref=$SHA_ANTERIOR"
+     curl -fsS "$RENDER_HOOK_FRONT_PROD&ref=$SHA_ANTERIOR"
+     ```
+  3. Monitorear en el Dashboard de Render (*Deploys*) hasta que el commit anterior alcance el estado **Live**.
+* **Medición Real del Rollback:**
+  - **Tiempo medido en Render:** **47 segundos**.
+  - El tiempo corresponde al ciclo completo de invocación del hook, aprovisionamiento del contenedor del commit previo y verificación de salud en Render.
+* **Limitación crítica de datos:** El rollback de código **no revierte cambios estructurales o destructivos en la base de datos** (como columnas eliminadas o datos modificados). Para ello se requerirían scripts de migración inversa (*down migrations*) y restauración de backups puntuales (*Point-in-time Recovery*).
+
+---
+
+### 8. Problemas Encontrados y Cómo se Resolvieron
+* **Problema 1 (Nombres duplicados en Render):** Al intentar crear los servicios con nombres genéricos (`ingsoft3-tp01-api-qa`), Render rechazó la creación con el error *"Name is already in use"* debido a que los subdominios `.onrender.com` son globales y ya estaban tomados por otros estudiantes.
+  - **Resolución:** Se parametrizaron nombres únicos con identificador personal (`ingsoft3-tp01-api-qa-new` e `ingsoft3-tp01-front-qa`).
+* **Problema 2 (Rutas fijas a localhost en el Frontend):** El código original de React realizaba llamadas a `http://localhost:3000/api/reservations`, lo cual en Render provocaba que el navegador del cliente intentara conectar a su propia máquina local en lugar de la API remota.
+  - **Resolución:** Se refactorizaron los componentes (`App.jsx` y `ReservationForm.jsx`) para utilizar rutas relativas `/api/reservations`, permitiendo que Nginx procese las solicitudes a través del proxy inverso dinámico hacia la API de Render.
+
+---
+
+### 9. Declaración de Uso de Inteligencia Artificial
+* **Uso de IA:** Se utilizó asistencia de IA (Antigravity / Gemini) para guiar el diseño del workflow de Continuous Delivery en GitHub Actions, estructurar la plantilla dinámica de Nginx con variables de entorno, y redactar las justificaciones técnicas y métricas de rollback.
+* **Verificación humana:** Se crearon manualmente los servicios y variables en Render y Neon, se configuraron los Environments y Secrets en GitHub, se provocó y documentó el rechazo manual en el Gate de Producción, se aprobó el despliegue con cambio observable en UI, y se verificó el tiempo de rollback y la publicación de los paquetes en GHCR.
