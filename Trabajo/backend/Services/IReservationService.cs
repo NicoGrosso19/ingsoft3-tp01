@@ -8,4 +8,5 @@ public interface IReservationService
     Task<(int StatusCode, ApiResponse<IEnumerable<Reservation>> Response)> GetReservationsAsync();
     Task<(int StatusCode, ApiResponse<Reservation> Response)> CreateReservationAsync(CreateReservationDto dto);
     Task<(int StatusCode, ApiResponse<Reservation> Response)> UpdateStatusAsync(int id, UpdateStatusDto dto);
+    Task<(int StatusCode, ApiResponse<object> Response)> DeleteReservationAsync(int id);
 }

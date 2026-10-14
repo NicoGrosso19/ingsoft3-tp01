@@ -28,16 +28,25 @@ export default function App() {
     setReservations((prev) => [newRes, ...prev]);
   };
 
+  const handleReservationDeleted = async (id) => {
+    try {
+      await fetch(`/api/reservations/${id}`, { method: 'DELETE' });
+      setReservations((prev) => prev.filter((r) => r.id !== id));
+    } catch (err) {
+      console.error('Error al borrar reserva', err);
+    }
+  };
+
   return (
     <div className="container">
       <header className="header">
-        <h1>Sistema de Reservas y Turnos (v6.0.0)</h1>
-        <p>Gestión inteligente y validada de turnos — Desplegado con CD Automatizado</p>
+        <h1>Sistema de Reservas y Turnos (v7.0.0)</h1>
+        <p>Gestión inteligente y validada de turnos — Desplegado con CD e Imágenes Inmutables</p>
       </header>
 
       <main className="main-grid">
         <ReservationForm onReservationCreated={handleReservationCreated} />
-        <ReservationList reservations={reservations} />
+        <ReservationList reservations={reservations} onDelete={handleReservationDeleted} />
       </main>
     </div>
   );

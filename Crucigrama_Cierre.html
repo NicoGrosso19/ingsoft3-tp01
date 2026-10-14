@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crucigrama de Cierre - Seguridad en Redes & ACL</title>
+<style>
+    :root {
+        --bg-dark: #0b1120;
+        --card-bg: #1e293b;
+        --card-border: #334155;
+        --text-main: #f8fafc;
+        --text-muted: #94a3b8;
+        --accent-blue: #38bdf8;
+        --accent-cyan: #06b6d4;
+        --accent-green: #10b981;
+        --accent-orange: #f59e0b;
+        --accent-red: #ef4444;
+        --accent-purple: #a855f7;
+    }
+
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
+    body {
+        font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+        background-color: var(--bg-dark);
+        color: var(--text-main);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 30px 20px;
+    }
+
+    .header-section {
+        text-align: center;
+        margin-bottom: 25px;
+    }
+
+    .badge {
+        background: rgba(56, 189, 248, 0.15);
+        color: var(--accent-blue);
+        border: 1px solid rgba(56, 189, 248, 0.3);
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        display: inline-block;
+        margin-bottom: 10px;
+    }
+
+    h1 {
+        font-size: 2.2rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #38bdf8, #a855f7);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 8px;
+    }
+
+    p.subtitle {
+        color: var(--text-muted);
+        font-size: 1.05rem;
+    }
+
+    .main-container {
+        display: grid;
+        grid-template-columns: 1.1fr 1fr;
+        gap: 30px;
+        max-width: 1200px;
+        width: 100%;
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 16px;
+        padding: 30px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+
+    /* Crossword Board */
+    .crossword-board {
+        display: grid;
+        grid-template-columns: repeat(12, 40px);
+        grid-template-rows: repeat(12, 40px);
+        gap: 3px;
+        background: #0f172a;
+        padding: 15px;
+        border-radius: 12px;
+        border: 1px solid var(--card-border);
+        justify-content: center;
+        align-content: center;
+        user-select: none;
+    }
+
+    .cell {
+        width: 40px;
+        height: 40px;
+        background: #0b1120;
+        border-radius: 4px;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .cell.active-cell {
+        background: #1e293b;
+        border: 1.5px solid var(--accent-blue);
+    }
+
+    .cell input {
+        width: 100%;
+        height: 100%;
+        background: transparent;
+        border: none;
+        color: var(--text-main);
+        font-size: 1.2rem;
+        font-weight: 800;
+        text-align: center;
+        text-transform: uppercase;
+        outline: none;
+        font-family: 'Consolas', monospace;
+    }
+
+    .cell.correct {
+        background: rgba(16, 185, 129, 0.25) !important;
+        border-color: var(--accent-green) !important;
+    }
+
+    .cell.correct input {
+        color: #34d399;
+    }
+
+    .cell-number {
+        position: absolute;
+        top: 2px;
+        left: 3px;
+        font-size: 0.65rem;
+        font-weight: bold;
+        color: var(--accent-orange);
+        pointer-events: none;
+    }
+
+    /* Clues Section */
+    .clues-section {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .clue-group {
+        background: #0f172a;
+        padding: 18px;
+        border-radius: 12px;
+        border: 1px solid var(--card-border);
+    }
+
+    .clue-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .clue-title.horiz { color: var(--accent-cyan); }
+    .clue-title.vert { color: var(--accent-purple); }
+
+    .clue-item {
+        font-size: 0.95rem;
+        color: var(--text-muted);
+        margin-bottom: 12px;
+        line-height: 1.5;
+        padding-left: 8px;
+        border-left: 3px solid transparent;
+        transition: all 0.2s;
+        cursor: pointer;
+    }
+
+    .clue-item:hover {
+        color: var(--text-main);
+        border-left-color: var(--accent-blue);
+    }
+
+    .clue-item strong {
+        color: var(--accent-orange);
+        font-size: 1rem;
+    }
+
+    /* Controls */
+    .action-buttons {
+        display: flex;
+        gap: 15px;
+        margin-top: 10px;
+    }
+
+    .btn {
+        flex: 1;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        font-weight: 700;
+        cursor: pointer;
+        border: none;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .btn-verify {
+        background: var(--accent-blue);
+        color: #0b1120;
+    }
+
+    .btn-verify:hover {
+        background: #7dd3fc;
+        transform: translateY(-2px);
+    }
+
+    .btn-reveal {
+        background: #334155;
+        color: var(--text-main);
+    }
+
+    .btn-reveal:hover {
+        background: #475569;
+        transform: translateY(-2px);
+    }
+
+    .btn-clear {
+        background: rgba(239, 68, 68, 0.2);
+        color: var(--accent-red);
+        border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+
+    .btn-clear:hover {
+        background: rgba(239, 68, 68, 0.3);
+    }
+
+    #feedbackMsg {
+        text-align: center;
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-top: 10px;
+        min-height: 25px;
+    }
+</style>
+</head>
+<body>
+
+<div class="header-section">
+    <div class="badge">🎯 Actividad Grupal de Cierre</div>
+    <h1>Desafío Crucigrama: Seguridad & ACLs</h1>
+    <p class="subtitle">¡Participación de la clase! Respondan las pistas para completar los conceptos clave.</p>
+</div>
+
+<div class="main-container">
+
+    <!-- Tablero de Crucigrama -->
+    <div style="display: flex; flex-direction: column; align-items: center;">
+        <div class="crossword-board" id="board">
+            <!-- Celdas generadas dinámicamente -->
+        </div>
+
+        <div id="feedbackMsg"></div>
+    </div>
+
+    <!-- Pistas y Controles -->
+    <div class="clues-section">
+        
+        <div class="clue-group">
+            <div class="clue-title horiz">👉 HORIZONTALES</div>
+            <div class="clue-item" onclick="focusWord('H1')">
+                <strong>1. ESTANDAR:</strong> Tipo de ACL en Cisco (rango 1–99) que filtra paquetes examinando <em>únicamente</em> la dirección IP de origen. (8 letras)
+            </div>
+            <div class="clue-item" onclick="focusWord('H3')">
+                <strong>3. DENY:</strong> Acción que descarta el tráfico en una ACL y representa la regla invisible implícita al final de toda lista. (4 letras)
+            </div>
+            <div class="clue-item" onclick="focusWord('H5')">
+                <strong>5. INTEGRIDAD:</strong> Pilar de la Tríada CIA que asegura que los datos no hayan sido modificados ni alterados durante su tránsito. (10 letras)
+            </div>
+        </div>
+
+        <div class="clue-group">
+            <div class="clue-title vert">👇 VERTICALES</div>
+            <div class="clue-item" onclick="focusWord('V2')">
+                <strong>2. EXTENDIDA:</strong> Tipo de ACL (rango 100–199) que filtra por IP origen, destino, protocolo de Capa 4 y puertos. (9 letras)
+            </div>
+            <div class="clue-item" onclick="focusWord('V4')">
+                <strong>4. PHISHING:</strong> Técnica de ingeniería social basada en engaño para inducir a los usuarios a entregar sus contraseñas. (8 letras)
+            </div>
+            <div class="clue-item" onclick="focusWord('V6')">
+                <strong>6. REMARK:</strong> Comando en Cisco IOS utilizado como buena práctica para documentar o comentar qué hace una regla. (6 letras)
+            </div>
+        </div>
+
+        <div class="action-buttons">
+            <button class="btn btn-verify" onclick="checkAnswers()">✨ Comprobar</button>
+            <button class="btn btn-reveal" onclick="revealSolution()">💡 Revelar Solución</button>
+            <button class="btn btn-clear" onclick="clearBoard()">🔄 Limpiar</button>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    // Definición de las palabras y posiciones en la cuadrícula 12x12 (Fila, Columna de 0 a 11)
+    const words = [
+        { id: "H1", num: 1, type: "H", word: "ESTANDAR", row: 2, col: 1 },
+        { id: "V2", num: 2, type: "V", word: "EXTENDIDA", row: 2, col: 1 }, // Cruza en 'E' con ESTANDAR
+        { id: "H3", num: 3, type: "H", word: "DENY", row: 7, col: 1 },     // Cruza en 'D' con EXTENDIDA
+        { id: "V4", num: 4, type: "V", word: "PHISHING", row: 1, col: 6 }, // Cruza en 'N' con ESTANDAR
+        { id: "H5", num: 5, type: "H", word: "INTEGRIDAD", row: 5, col: 2 },// Cruza en 'I' con PHISHING
+        { id: "V6", num: 6, type: "V", word: "REMARK", row: 5, col: 7 }     // Cruza en 'R' con INTEGRIDAD
+    ];
+
+    const grid = Array(12).fill(null).map(() => Array(12).fill(null));
+
+    // Mapear palabras a la grilla
+    words.forEach(w => {
+        for (let i = 0; i < w.word.length; i++) {
+            const r = w.type === "H" ? w.row : w.row + i;
+            const c = w.type === "H" ? w.col + i : w.col;
+            if (!grid[r][c]) {
+                grid[r][c] = { letter: w.word[i], num: (i === 0 ? w.num : null), words: [w.id] };
+            } else {
+                grid[r][c].words.push(w.id);
+                if (i === 0 && !grid[r][c].num) grid[r][c].num = w.num;
+            }
+        }
+    });
+
+    const board = document.getElementById("board");
+
+    // Renderizar tablero
+    for (let r = 0; r < 12; r++) {
+        for (let c = 0; c < 12; c++) {
+            const cellDiv = document.createElement("div");
+            cellDiv.className = "cell";
+            cellDiv.id = `cell-${r}-${c}`;
+
+            if (grid[r][c]) {
+                cellDiv.classList.add("active-cell");
+                if (grid[r][c].num) {
+                    const numSpan = document.createElement("span");
+                    numSpan.className = "cell-number";
+                    numSpan.textContent = grid[r][c].num;
+                    cellDiv.appendChild(numSpan);
+                }
+
+                const input = document.createElement("input");
+                input.maxLength = 1;
+                input.id = `input-${r}-${c}`;
+                input.dataset.expected = grid[r][c].letter;
+
+                input.addEventListener("input", (e) => {
+                    input.value = input.value.toUpperCase();
+                    if (input.value) autoAdvance(r, c);
+                });
+
+                input.addEventListener("keydown", (e) => {
+                    if (e.key === "Backspace" && !input.value) {
+                        autoBack(r, c);
+                    }
+                });
+
+                cellDiv.appendChild(input);
+            }
+
+            board.appendChild(cellDiv);
+        }
+    }
+
+    function autoAdvance(r, c) {
+        // Buscar siguiente celda horizontal o vertical
+        if (c + 1 < 12 && grid[r][c+1]) {
+            document.getElementById(`input-${r}-${c+1}`)?.focus();
+        } else if (r + 1 < 12 && grid[r+1][c]) {
+            document.getElementById(`input-${r+1}-${c}`)?.focus();
+        }
+    }
+
+    function autoBack(r, c) {
+        if (c - 1 >= 0 && grid[r][c-1]) {
+            document.getElementById(`input-${r}-${c-1}`)?.focus();
+        } else if (r - 1 >= 0 && grid[r-1][c]) {
+            document.getElementById(`input-${r-1}-${c}`)?.focus();
+        }
+    }
+
+    function checkAnswers() {
+        let allCorrect = true;
+        let filledCount = 0;
+        let totalActive = 0;
+
+        for (let r = 0; r < 12; r++) {
+            for (let c = 0; c < 12; c++) {
+                if (grid[r][c]) {
+                    totalActive++;
+                    const input = document.getElementById(`input-${r}-${c}`);
+                    const cell = document.getElementById(`cell-${r}-${c}`);
+                    if (input.value.toUpperCase() === grid[r][c].letter) {
+                        cell.classList.add("correct");
+                        filledCount++;
+                    } else {
+                        cell.classList.remove("correct");
+                        allCorrect = false;
+                    }
+                }
+            }
+        }
+
+        const msg = document.getElementById("feedbackMsg");
+        if (allCorrect) {
+            msg.style.color = "var(--accent-green)";
+            msg.textContent = "🎉 ¡Excelente! ¡Han completado el crucigrama con 100% de aciertos!";
+        } else {
+            msg.style.color = "var(--accent-orange)";
+            msg.textContent = `Aciertos: ${filledCount} de ${totalActive} letras. ¡Sigan intentando!`;
+        }
+    }
+
+    function revealSolution() {
+        for (let r = 0; r < 12; r++) {
+            for (let c = 0; c < 12; c++) {
+                if (grid[r][c]) {
+                    const input = document.getElementById(`input-${r}-${c}`);
+                    const cell = document.getElementById(`cell-${r}-${c}`);
+                    input.value = grid[r][c].letter;
+                    cell.classList.add("correct");
+                }
+            }
+        }
+        const msg = document.getElementById("feedbackMsg");
+        msg.style.color = "var(--accent-cyan)";
+        msg.textContent = "💡 ¡Solución revelada para debatir en clase!";
+    }
+
+    function clearBoard() {
+        for (let r = 0; r < 12; r++) {
+            for (let c = 0; c < 12; c++) {
+                if (grid[r][c]) {
+                    const input = document.getElementById(`input-${r}-${c}`);
+                    const cell = document.getElementById(`cell-${r}-${c}`);
+                    input.value = "";
+                    cell.classList.remove("correct");
+                }
+            }
+        }
+        document.getElementById("feedbackMsg").textContent = "";
+    }
+
+    function focusWord(wordId) {
+        const w = words.find(item => item.id === wordId);
+        if (w) {
+            document.getElementById(`input-${w.row}-${w.col}`)?.focus();
+        }
+    }
+</script>
+
+</body>
+</html>

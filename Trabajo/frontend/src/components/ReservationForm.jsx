@@ -74,7 +74,7 @@ export default function ReservationForm({ onReservationCreated }) {
       </h2>
 
       {serverMessage && (
-        <div className={`alert-message ${serverMessage.type === 'success' ? 'alert-success' : 'alert-error'}`}>
+        <div role="alert" className={`alert-message ${serverMessage.type === 'success' ? 'alert-success' : 'alert-error'}`}>
           {serverMessage.text}
         </div>
       )}
@@ -91,7 +91,7 @@ export default function ReservationForm({ onReservationCreated }) {
             onChange={(e) => setUserName(e.target.value)}
           />
           {userName && !isNameValid && (
-            <p className="hint-text error">El nombre es requerido (R2).</p>
+            <p role="alert" className="hint-text error">El nombre es requerido (R2).</p>
           )}
         </div>
 
@@ -106,7 +106,7 @@ export default function ReservationForm({ onReservationCreated }) {
             onChange={(e) => setUserEmail(e.target.value)}
           />
           {userEmail && !isEmailValid && (
-            <p className="hint-text error">Ingrese un e-mail válido (R2).</p>
+            <p role="alert" className="hint-text error">Ingrese un e-mail válido (R2).</p>
           )}
         </div>
 
@@ -121,7 +121,7 @@ export default function ReservationForm({ onReservationCreated }) {
             onChange={(e) => setDateTime(e.target.value)}
           />
           {dateTime && !isDateValid ? (
-            <p className="hint-text error">{dateErrorMessage}</p>
+            <p role="alert" className="hint-text error">{dateErrorMessage}</p>
           ) : (
             <p className="hint-text">Intervalos válidos: hh:00 o hh:30 (R1).</p>
           )}

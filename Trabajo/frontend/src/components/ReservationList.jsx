@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export default function ReservationList({ reservations, onStatusChange }) {
+export default function ReservationList({ reservations, onStatusChange, onDelete }) {
   const [filter, setFilter] = useState('Todos');
 
   const filteredReservations = reservations.filter((item) => {
@@ -80,6 +80,23 @@ export default function ReservationList({ reservations, onStatusChange }) {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
                   {getStatusBadge(status)}
+                  <button
+                    type="button"
+                    aria-label={`Borrar ${name}`}
+                    className="btn-delete"
+                    style={{
+                      background: 'transparent',
+                      border: '1px solid #ef4444',
+                      color: '#ef4444',
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem'
+                    }}
+                    onClick={() => onDelete && onDelete(resId)}
+                  >
+                    🗑️ Borrar
+                  </button>
                 </div>
               </div>
             );
