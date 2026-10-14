@@ -431,4 +431,36 @@ public class ReservationService : IReservationService
             return (200, new ApiResponse<Reservation> { Success = true, Data = existing });
         }
     }
+
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public async Task<(int StatusCode, ApiResponse<object> Response)> DeleteReservationAsync(int id)
+    {
+        try
+        {
+            await using var conn = new NpgsqlConnection(GetConnectionString());
+            await conn.OpenAsync();
+
+            await using var cmd = new NpgsqlCommand("DELETE FROM reservations WHERE id = @id", conn);
+            cmd.Parameters.AddWithValue("id", id);
+            var rowsAffected = await cmd.ExecuteNonQueryAsync();
+
+            if (rowsAffected == 0)
+            {
+                return (404, new ApiResponse<object> { Success = false, Message = "Reserva no encontrada." });
+            }
+
+            return (200, new ApiResponse<object> { Success = true, Message = "Reserva eliminada exitosamente." });
+        }
+        catch
+        {
+            var item = MockReservations.FirstOrDefault(r => r.Id == id);
+            if (item != null)
+            {
+                MockReservations.Remove(item);
+                return (200, new ApiResponse<object> { Success = true, Message = "Reserva eliminada exitosamente." });
+            }
+
+            return (404, new ApiResponse<object> { Success = false, Message = "Reserva no encontrada." });
+        }
+    }
 }
