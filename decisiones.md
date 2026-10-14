@@ -317,3 +317,121 @@ Se excluyeron de la medición aquellas piezas sin lógica de negocio propia medi
 ### 9. Declaración de Uso de Inteligencia Artificial
 * **Uso de IA:** Se utilizó asistencia de IA (Antigravity / Gemini) para guiar el diseño del workflow de Continuous Delivery en GitHub Actions, estructurar la plantilla dinámica de Nginx con variables de entorno, y redactar las justificaciones técnicas y métricas de rollback.
 * **Verificación humana:** Se crearon manualmente los servicios y variables en Render y Neon, se configuraron los Environments y Secrets en GitHub, se provocó y documentó el rechazo manual en el Gate de Producción, se aprobó el despliegue con cambio observable en UI, y se verificó el tiempo de rollback y la publicación de los paquetes en GHCR.
+
+
+
+---
+
+## ## TP7 — Contenedores en el Pipeline, Integración y End-to-End (E2E)
+
+### 1. Enlaces del TP7 (Entregables Obligatorios)
+
+| Recurso | Descripción | Enlace de Verificación |
+|---|---|---|
+| **Paquete Backend en GHCR** | Imagen de backend en GitHub Packages (Pública, etiquetada con commit SHA) | [ghcr.io/nicogrosso19/ingsoft3-tp01-backend:sha-85adfb956e13814312e3fa81b7666bee5eb0fea1](https://github.com/NicoGrosso19/ingsoft3-tp01/pkgs/container/ingsoft3-tp01-backend) |
+| **Paquete Frontend en GHCR** | Imagen de frontend en GitHub Packages (Pública, etiquetada con commit SHA) | [ghcr.io/nicogrosso19/ingsoft3-tp01-frontend:sha-85adfb956e13814312e3fa81b7666bee5eb0fea1](https://github.com/NicoGrosso19/ingsoft3-tp01/pkgs/container/ingsoft3-tp01-frontend) |
+| **Commit que rompió la app (Freno de Gate)** | Commit con texto del botón modificado en el front para disparar fallo en E2E | [Commit #38cf59c](https://github.com/NicoGrosso19/ingsoft3-tp01/commit/38cf59c3e42ae4be38f43bb98009c9c235136de0) · [PR #29](https://github.com/NicoGrosso19/ingsoft3-tp01/pull/29) |
+| **Corrida con Integración VERDE + E2E ROJA** | Corrida en `main` donde la integración pasó, la E2E falló y `deploy-prod` quedó **bloqueado sin ejecutar** | [Ver Run #38500367544](https://github.com/NicoGrosso19/ingsoft3-tp01/actions/runs/38500367544) |
+| **Artefacto Reporte Integración (Verde)** | Reporte HTML de Playwright generado en la corrida con fallo (`3 passed`) | Descargable en [Run #38500367544 (Artifacts)](https://github.com/NicoGrosso19/ingsoft3-tp01/actions/runs/38500367544) |
+| **Artefacto Reporte E2E (Rojo)** | Reporte HTML con traza y screenshot del botón no encontrado (`1 failed, 2 passed`) | Descargable en [Run #38500367544 (Artifacts)](https://github.com/NicoGrosso19/ingsoft3-tp01/actions/runs/38500367544) |
+| **Corrida Completa en Verde hasta PROD** | Corrida posterior con el arreglo aplicado, pasando integración, E2E y deploy a PROD aprobado | [Ver Run Aprobado #38501988923](https://github.com/NicoGrosso19/ingsoft3-tp01/actions/runs/38501988923) |
+| **API QA (Render + Neon)** | Backend en QA ejecutando la imagen binaria de GHCR | [https://ingsoft3-tp01-api-qa-new.onrender.com](https://ingsoft3-tp01-api-qa-new.onrender.com) |
+| **Frontend QA (Render)** | Frontend en QA ejecutando la imagen binaria de GHCR | [https://ingsoft3-tp01-front-qa.onrender.com](https://ingsoft3-tp01-front-qa.onrender.com) |
+| **API PROD (Render + Neon)** | Backend en Producción ejecutando la misma imagen binaria verificada | [https://ingsoft3-tp01-api-prod.onrender.com](https://ingsoft3-tp01-api-prod.onrender.com) |
+| **Frontend PROD (Render)** | Frontend en Producción con versión visible v7.0.0 | [https://ingsoft3-tp01-front-prod.onrender.com](https://ingsoft3-tp01-front-prod.onrender.com) |
+| **Release de Cierre v7.0.0** | Release oficial del TP7 en GitHub sobre el commit desplegado en Producción | [Release v7.0.0](https://github.com/NicoGrosso19/ingsoft3-tp01/releases/tag/v7.0.0) |
+
+---
+
+### 2. Build Once, Deploy Many: La Imagen como Unidad de Release
+* **El problema resuelto del TP6:** En el TP6, el pipeline enviaba una señal a Render (`&ref=$GITHUB_SHA`) para que Render descargara el código y volviera a compilar la aplicación en cada entorno. Esto rompía el principio fundamental de inmutabilidad: lo que corría en Producción era una **reconstrucción** del código fuente y no el binario exacto probado en QA. Si entre el despliegue de QA y la aprobación a PROD una dependencia remota o una imagen base (`node:alpine`, `mcr.microsoft.com/...`) se actualizaba, Producción podía fallar inexplicablemente.
+* **La solución en el TP7:** El pipeline compila y empaqueta la aplicación **una sola vez** durante los jobs de build y publica las imágenes binarias en `ghcr.io`. Luego, QA y PROD configuran sus servicios como *Existing Image* y el pipeline les indica exactamente qué imagen ejecutar mediante el parámetro `imgURL` en el Deploy Hook (`imgURL=ghcr.io/nicogrosso19/ingsoft3-tp01-backend:sha-<commit>`). De esta forma, **QA y PROD ejecutan exactamente el mismo artefacto inmutable bit a bit**.
+
+---
+
+### 3. Estrategia de Identidad y Versionado de Imágenes
+* **`sha-<commit>` (Identidad de Release):** Cada imagen publicada en `ghcr.io` se etiqueta con el commit SHA completo de 40 caracteres (`sha-${{ github.sha }}`). Esto provee trazabilidad determinista: se sabe exactamente qué versión de código fuente generó la imagen binaria.
+* **Por qué NO publicar `latest`:** La etiqueta `latest` es un puntero mutable que se desplaza en cada merge o push. Si un despliegue apuntara a `latest`, sería imposible auditar qué versión está corriendo en el servidor o ejecutar un rollback predecible.
+* **Configuración inicial en Render vs. Ejecución Real:** Al migrar los servicios de Render a *Existing Image*, la plataforma solicita una URL de imagen inicial como punto de partida (se configuró con el commit anterior `sha-205ee13...`). Sin embargo, esa imagen **no es la que corre permanentemente**: en cada merge a `main`, el pipeline invoca el Deploy Hook pasando dinámicamente `imgURL=...:sha-<nuevo-commit>`, sobrescribiendo la imagen activa en tiempo de ejecución.
+
+---
+
+### 4. De la Release a la Imagen en un Solo Paso
+Para relacionar un punto de entrega con su artefacto en el registry:
+1. Desde el tag de Git se obtiene el commit SHA exacto en un solo comando:
+   ```bash
+   git rev-list -n1 v7.0.0
+   # Devuelve: 85adfb956e13814312e3fa81b7666bee5eb0fea1
+   ```
+2. La imagen correspondiente en GitHub Packages es inmediatamente:
+   - Backend: `ghcr.io/nicogrosso19/ingsoft3-tp01-backend:sha-85adfb956e13814312e3fa81b7666bee5eb0fea1`
+   - Frontend: `ghcr.io/nicogrosso19/ingsoft3-tp01-frontend:sha-85adfb956e13814312e3fa81b7666bee5eb0fea1`
+* **Rollback directo:** Volver a la versión `v7.0.0` no requiere compilar código antiguo; simplemente se invoca el hook de Render enviando el `imgURL` con ese SHA.
+
+---
+
+### 5. Comprobación de Ejecución de Imagen vs. Reconstrucción
+* **Comprobación en Render:** En la pestaña **Events** de cada servicio en Render, el despliegue figura explícitamente como:
+  *`Deploy live for ghcr.io/nicogrosso19/ingsoft3-tp01-...:sha-<commit> (Triggered via Deploy Hook)`*
+  A diferencia del TP6 (donde decía *Build succeeded* y clonaba el repositorio git), ahora Render no ejecuta ningún build: solo descarga (*pull*) y levanta el contenedor.
+* **Limitación del Smoke Test:** El smoke test (`curl /health`) solo verifica que el proceso responda con HTTP 200, pero no sabe qué commit o versión binaria está corriendo. Si un despliegue de imagen falla o tarda, el servicio anterior sigue vivo y el smoke daría verde contra la versión vieja. La verificación real de la imagen promovida se comprueba con la ejecución de las suites de Integración y E2E contra el entorno.
+
+---
+
+### 6. Suites de Prueba: Integración y E2E (La Pirámide en Acción)
+
+#### A. Pruebas de Integración (`Trabajo/frontend/e2e/api.spec.js`)
+* **Herramienta:** Playwright en modo cliente HTTP directo (`fixture request`), sin abrir navegador.
+* **Objetivo:** Comunicarse directamente con la API desplegada en QA (`API_BASE_URL`) interactuando con la base de datos PostgreSQL real de Neon, sin dobles ni mocks.
+* **Pruebas implementadas:**
+  1. *Alta, Verificación y Borrado:* Crea un turno con nombre único (`Date.now()`), valida que el `GET /api/reservations` lo devuelva persistido en PostgreSQL, ejecuta `DELETE /api/reservations/{id}` y comprueba que desaparezca.
+  2. *Alta inválida (Nombre vacío):* Envía un payload sin nombre y comprueba que la API responda `400 Bad Request` y que el conteo de registros en la base no se incremente.
+  3. *Regla de Negocio R3 (Solapamiento de Horarios):* Crea un primer turno y luego intenta agendar un segundo turno con otro usuario en el mismo horario exacto; verifica que la API responda `409 Conflict`.
+* **Por qué es Integración Amplia:** Se ejecuta contra la API **ya desplegada en QA** con su base de datos real. Gana realismo total de red, drivers de base de datos y configuración de entorno, evitando la sobrecarga de levantar bases de datos temporales en el runner.
+
+#### B. Pruebas End-to-End (`Trabajo/frontend/e2e/reservas.spec.js`)
+* **Herramienta:** Playwright controlando un navegador Chromium real.
+* **Objetivo:** Ejercitar la aplicación tal como lo haría un usuario final a través de la interfaz web desplegada en QA (`E2E_BASE_URL`).
+* **Flujos implementados:**
+  1. *Creación, Verificación y Borrado en UI:* Completa los campos usando etiquetas accesibles (`getByLabel`), clickea `Confirmar Reserva`, espera que aparezca en el listado y lo borra con el botón `Borrar <nombre>`, validando que desaparezca del DOM.
+  2. *Validación en Cliente y Accesibilidad:* Ingresa datos inválidos (email sin formato, horario con minutos no múltiplos de 30) y comprueba que aparezcan los mensajes de error con `role="alert"` y que el botón de confirmación permanezca deshabilitado (`toBeDisabled()`).
+  3. *Flujo Cotidiano (Filtros interactivos):* Alterna entre los filtros "Confirmados", "Cancelados" y "Todos", comprobando que la interfaz aplique las clases activas y filtre la lista en pantalla.
+
+---
+
+### 7. Diagnóstico del Par Verde/Rojo: Qué ve cada capa
+Durante la prueba obligatoria de la Tarea 4 se provocó un fallo deliberado en la interfaz cambiando el texto del botón de confirmación a `"Solicitar Cita"` en lugar de `"Confirmar Reserva"`. 
+
+El resultado en la corrida **#38500367544** demostró el poder de diagnóstico de la pirámide:
+
+| Suite | Resultado | Significado Técnico |
+|---|---|---|
+| **Smoke Test** | 🟢 **VERDE** | El proceso responde HTTP 200 en `/health` y los endpoints están vivos. |
+| **Integración (`api.spec.js`)** | 🟢 **VERDE** | La API y la base de datos PostgreSQL funcionan perfectamente: crean, validan y borran reservas sin fallas. |
+| **E2E (`reservas.spec.js`)** | 🔴 **ROJA** | El navegador no pudo encontrar el botón `"Confirmar Reserva"`, arrojando error de timeout en Playwright. |
+| **Deploy a PROD (`deploy-prod`)** | ⛔ **SALTEADO** | Al fallar la E2E, la compuerta (`needs: e2e`) impidió la promoción a Producción. |
+
+* **Diagnóstico:** Si la integración está VERDE y la E2E está ROJA, **la falla está exclusivamente en la capa de Frontend (UI/UX)**, ya que la API y la persistencia están sanas. Si se hubiera roto la API, la integración habría caído primero en ROJO y la E2E ni siquiera se habría ejecutado, ahorrando tiempo de cómputo en el runner.
+
+---
+
+### 8. Manejo de Free Tiers y Prevención de Tests Flaky
+* **Auto-waiting:** Playwright espera automáticamente a que los elementos del DOM existan, sean visibles y estén habilitados antes de clickear o escribir. No se utilizan `sleep()` arbitrarios que generan tests inestables (*flaky*).
+* **Timeouts y Retries:** Debido a la latencia y posibles arranques en frío de Render/Neon, en `playwright.config.js` se definieron `timeout: 60_000ms`, `expect: 15_000ms` y `retries: 1`. El reintento absorbe demoras transitorias de red, pero si el fallo es genuino, el test se marca como fallido en rojo.
+* **Higiene de Datos:** Cada test genera identificadores únicos con `Date.now()` y ejecuta su correspondiente borrado al finalizar, evitando colisiones entre ejecuciones concurrentes en el entorno compartido de QA.
+
+---
+
+### 9. Problemas Encontrados y Soluciones
+1. **Falta de endpoint de borrado en Backend:** El backend original solo soportaba cancelación de estado pero no eliminación física, lo que impedía limpiar la base de datos en los tests de integración.
+   - *Solución:* Se implementó `DeleteReservationAsync` en `ReservationService.cs` y el endpoint `DELETE /api/reservations/{id}` en `ReservationsController.cs`.
+2. **Desalineación de sintaxis JSX en Frontend:** Al incorporar roles accesibles en `ReservationForm.jsx`, se produjo un cierre incorrecto de etiquetas que impedía la compilación.
+   - *Solución:* Se reestructuró el formulario con etiquetas consistentes y se validó la compilación localmente con `npm run build`.
+3. **Colisión de Vitest con specs de Playwright:** Vitest intentaba ejecutar los tests de Playwright dentro del job de unit tests.
+   - *Solución:* Se configuró `exclude: [...configDefaults.exclude, 'e2e/**']` en `vite.config.js`.
+
+---
+
+### 10. Declaración de Uso de Inteligencia Artificial
+* **Uso de IA:** Se utilizó asistencia de IA (Antigravity / Gemini) para diseñar las suites de prueba en Playwright (`api.spec.js` y `reservas.spec.js`), estructurar los jobs de integración y E2E en GitHub Actions, y documentar el análisis del diagnóstico del par verde/rojo.
+* **Verificación humana:** Se programaron y compilaron los endpoints del backend, se verificaron los selectores accesibles en los componentes React, se ejecutaron las suites localmente y en GitHub Actions, se auditó el bloqueo efectivo del Gate ante la rotura del front, y se aprobó manualmente el despliegue final a Producción.
