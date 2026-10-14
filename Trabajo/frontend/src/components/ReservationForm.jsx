@@ -127,14 +127,13 @@ export default function ReservationForm({ onReservationCreated }) {
           )}
         </div>
 
-        {/* CAMBIO DELIBERADO: Cambiar texto del botón para provocar fallo en E2E */}
         <button
           id="submitReservationBtn"
           type="submit"
           className="btn-primary"
           disabled={!isFormValid || isSubmitting}
         >
-          {isSubmitting ? 'Procesando...' : 'Solicitar Cita'}
+          {isSubmitting ? 'Procesando...' : 'Confirmar Reserva'}
         </button>
       </form>
     </div>
