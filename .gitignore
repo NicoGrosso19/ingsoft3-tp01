@@ -16,3 +16,9 @@ Thumbs.db
 .idea/
 playwright-report/
 test-results/
+
+# terraform (IaC) - NUNCA versionar estado ni variables locales
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars

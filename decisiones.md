@@ -435,3 +435,77 @@ El resultado en la corrida **#38500367544** demostró el poder de diagnóstico d
 ### 10. Declaración de Uso de Inteligencia Artificial
 * **Uso de IA:** Se utilizó asistencia de IA (Antigravity / Gemini) para diseñar las suites de prueba en Playwright (`api.spec.js` y `reservas.spec.js`), estructurar los jobs de integración y E2E en GitHub Actions, y documentar el análisis del diagnóstico del par verde/rojo.
 * **Verificación humana:** Se programaron y compilaron los endpoints del backend, se verificaron los selectores accesibles en los componentes React, se ejecutaron las suites localmente y en GitHub Actions, se auditó el bloqueo efectivo del Gate ante la rotura del front, y se aprobó manualmente el despliegue final a Producción.
+
+---
+
+## ## TP8 — Infraestructura como Código (IaC) con Terraform
+
+### 1. Riel Tecnológico y Versiones de Providers Fijadas
+* **Riel Seleccionado:** Riel Canónico de la materia (**Terraform + Neon + Render**), operando sobre la misma nube y cuentas utilizadas en los TPs anteriores.
+* **Declaración de Entorno Nuevo (`preprod`):** Se diseñó e implementó un tercer entorno intermedio (`preprod`) completamente nuevo y efímero, compuesto por:
+  - Base de datos relacional dedicada en **Neon PostgreSQL** (`neon_project`, `neon_role` y `neon_database`).
+  - Servicios de Backend (API) y Frontend (Nginx SPA) en **Render** (`render_web_service`) consumiendo las imágenes binarias inmutables generadas en el TP7 desde GitHub Container Registry (`ghcr.io/nicogrosso19/ingsoft3-tp01-backend:sha-85adfb956e13814312e3fa81b7666bee5eb0fea1` y `ghcr.io/nicogrosso19/ingsoft3-tp01-frontend:sha-85adfb956e13814312e3fa81b7666bee5eb0fea1`).
+* **Preservación de Entornos Preexistentes:** Los entornos `qa` y `production` configurados en TP6 y TP7 permanecieron intactos, sin sufrir modificaciones, importaciones ni afectación de servicio.
+* **Versiones de Providers Fijadas en HCL (`infra/main.tf`):**
+  - **`neon`:** Fuente `kislerdm/neon`, versión fijada estrictamente en `0.18.0`.
+  - **`render`:** Fuente `render-oss/render`, versión fijada estrictamente en `1.9.1`.
+  - Ambas versiones quedaron registradas de forma determinista con sus hashes criptográficos en el archivo de bloqueo `.terraform.lock.hcl`.
+* **Derivación Dinámica de Secretos y Direcciones:**
+  - La cadena de conexión `ConnectionStrings__Default` no se copió manualmente; se construyó dinámicamente en el bloque `locals` combinando el host (`neon_project.preprod.database_host`), nombre de la base, usuario y la contraseña generada por Neon (`neon_role.preprod.password`).
+  - La variable `BACKEND_URL` del frontend se derivó directamente del atributo `render_web_service.api.url` emitido por el servicio del backend.
+
+---
+
+### 2. Ciclo de Vida, Idempotencia, Estado y Drift Observado
+
+#### A. Idempotencia y Estado Local
+* **Idempotencia Comprobada:** Tras aplicar la infraestructura inicial con `terraform apply`, la ejecución de una segunda pasada inmediata arrojó:
+  `No changes. Your infrastructure matches the configuration.` demostrando la convergencia declarativa.
+* **Inspección del Estado (`terraform.tfstate`):** Se verificó que el estado local mapea los identificadores y expone en texto plano atributos sensibles (contraseñas de rol `database_password: "npg_..."`). Por esta razón crítica de seguridad, el archivo de estado y sus respaldos están expresamente ignorados en `.gitignore` y jamás deben commitearse a control de versiones.
+
+#### B. Experimento de Drift (Deriva de Infraestructura)
+* **Drift Detectado:** Se eliminó manualmente la base de datos `app_preprod` fuera de Terraform mediante la API de Neon. Al ejecutar `terraform plan`, Terraform refrescó la realidad contra el estado y detectó la discrepancia (`# neon_database.preprod will be created`, `Plan: 1 to add, 0 to change, 0 to destroy`). Un posterior `terraform apply` convergió la realidad de regreso al código.
+* **Lo que NO detecta:** Se creó manualmente en Neon una base de datos intrusa no declarada (`base_intrusa`). Al ejecutar `terraform plan`, la salida continuó indicando `No changes`, demostrando que Terraform únicamente audita los recursos declarados bajo su gobierno y es ciego ante recursos huérfanos creados externamente. La base intrusa fue depurada manualmente.
+
+#### C. Red de Seguridad (`prevent_destroy`)
+* Se ensayó temporalmente la instrucción `lifecycle { prevent_destroy = true }` sobre `neon_database.preprod`. Al intentar ejecutar `terraform destroy`, Terraform rechazó categóricamente la acción con el error:
+  `Error: Instance cannot be destroyed ... Resource neon_database.preprod has lifecycle.prevent_destroy set`.
+  Posteriormente se retiró la protección para permitir la naturaleza efímera del entorno de preproducción.
+
+#### D. Ciclo de Destrucción y Recreación (`destroy` ➔ `apply`)
+* Al ejecutar `terraform destroy`, se observó el desmontaje siguiendo estrictamente el grafo de dependencias en orden inverso:
+  `render_web_service.front` ➔ `render_web_service.api` ➔ `neon_database.preprod` ➔ `neon_role.preprod` ➔ `neon_project.preprod`.
+* Un posterior `terraform apply` recreó la totalidad del entorno desde cero en segundos, comprobándose el funcionamiento inmediato con:
+  - `/health` ➔ HTTP 200 `{"status":"ok"}`
+  - `/api/reservations` ➔ HTTP 200 `{"success":true,"data":[]}`
+  - Frontend SPA ➔ HTTP 200 OK
+
+---
+
+### 3. Problemas Encontrados y Cómo se Resolvieron
+
+1. **Límite de Retención de Historial en Neon Free Tier:**
+   - *Problema:* El provider `kislerdm/neon` solicita por defecto 86400 segundos (24 horas) de retención. En el plan gratuito de Neon, el apply falló con `requested history retention seconds exceeds allowed maximum`.
+   - *Resolución:* Se configuró explícitamente `history_retention_seconds = 21600` (6 horas, límite máximo admitido en la capa free) dentro del recurso `neon_project.preprod`.
+
+2. **Requerimiento de Organization ID en Neon (`org_id`):**
+   - *Problema:* Al aplicar la creación del proyecto, la API de Neon rechazó la solicitud con HTTP 400: `org_id is required, you can find it on your organization settings page`.
+   - *Resolución:* Se consultó el endpoint de organizaciones de Neon (`/v1/users/me/organizations`), identificando la organización activa `org-silent-bread-82823361`. Se parametrizó en `infra/variables.tf` la variable `neon_org_id` y se asignó `org_id = var.neon_org_id` en el recurso `neon_project.preprod`.
+
+3. **Owner ID Inválido en Provider de Render:**
+   - *Problema:* Se intentó utilizar un identificador parcial/usuario `usr-dat6p8c9v7es73aocgcg`, ocasionando el error: `invalid ownerID: usr-... valid owner IDs can be found using the /v1/owners API`.
+   - *Resolución:* Se auditó el endpoint `/v1/owners` de Render mediante script seguro, descubriendo que la cuenta opera como Team con el identificador `tea-dat6p8c9v7es73aocg20`. Se actualizó la variable de entorno `RENDER_OWNER_ID` con el ID de equipo correcto, permitiendo el aprovisionamiento inmediato de ambos servicios web.
+
+4. **Defecto de Actualización en Servicios Free Tier de Render:**
+   - *Problema:* En la capa gratuita de Render, cualquier intento de actualización in-place de un servicio existente falla con `maintenance mode can only be configured for non-free tier services` debido a una limitación del provider.
+   - *Resolución:* Se adoptó la práctica recomendada de entornos efímeros: preprod no se actualiza en caliente; se destruye y se vuelve a aplicar (`terraform destroy && terraform apply`), o se utiliza reemplazo explícito (`-replace`), garantizando inmutabilidad y despliegues limpios sin costo adicional.
+
+5. **Letra Chica de las 750 Horas Compartidas en Render:**
+   - *Problema:* Las 750 horas mensuales gratuitas de Render son compartidas a nivel workspace entre todos los servicios (QA, PROD y PREPROD). Mantener 6 servicios levantados de forma permanente arriesga la suspensión total del workspace antes de la defensa oral.
+   - *Resolución:* Se estableció como política operativa ejecutar `terraform destroy` al concluir las sesiones de prueba. Al estar la infraestructura 100% declarada en código en `infra/`, preprod puede nacer bajo demanda en vivo frente al docente en cuestión de segundos, sin comprometer la cuota de producción.
+
+---
+
+### 4. Declaración de Uso de Inteligencia Artificial
+* **Uso de IA:** Se utilizó asistencia de IA (Antigravity / Gemini) para estructurar el código HCL modular de Terraform (`infra/main.tf`, `infra/variables.tf`, `infra/outputs.tf`), depurar las llamadas de introspección a las APIs de Neon y Render para la resolución de IDs de organización y equipo, y documentar el análisis del ciclo de vida y drift.
+* **Verificación humana:** Se ejecutó localmente el flujo completo de Terraform (`init`, `fmt`, `validate`, `plan`, `apply`, `destroy`), se comprobaron las respuestas de los endpoints `/health` y `/api/reservations` en preprod, se provocó y validó la recuperación de drift manual en Neon, y se verificó que los entornos preexistentes de QA y Producción no sufrieran alteraciones.
