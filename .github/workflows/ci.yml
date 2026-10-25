@@ -51,7 +51,7 @@ jobs:
           cat coveragereport/SummaryGithub.md >> $GITHUB_STEP_SUMMARY
 
       - name: Publicar coverage y resultados
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
           name: coverage-report
@@ -125,7 +125,7 @@ jobs:
           " >> $GITHUB_STEP_SUMMARY
 
       - name: Publicar el coverage del frontend
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
           name: coverage-frontend
@@ -209,7 +209,7 @@ jobs:
         working-directory: ./Trabajo/frontend
 
       - name: Publicar reporte de integración
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
           name: playwright-report-integracion
@@ -244,7 +244,7 @@ jobs:
         working-directory: ./Trabajo/frontend
 
       - name: Publicar reporte e2e
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
           name: playwright-report-e2e
