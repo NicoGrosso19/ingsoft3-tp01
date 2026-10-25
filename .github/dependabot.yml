@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # Dependencias del Backend (.NET / NuGet)
+  - package-ecosystem: "nuget"
+    directory: "/Trabajo/backend"
+    schedule:
+      interval: "weekly"
+
+  # Dependencias del Frontend (React / npm)
+  - package-ecosystem: "npm"
+    directory: "/Trabajo/frontend"
+    schedule:
+      interval: "weekly"
+
+  # Dependencias de GitHub Actions (Workflows)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

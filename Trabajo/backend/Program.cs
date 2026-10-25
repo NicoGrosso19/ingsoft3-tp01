@@ -48,10 +48,9 @@ var app = builder.Build();
 app.UseCors("AllowAll");
 app.UseAuthorization();
 app.MapControllers();
-app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.MapMethods("/health", new[] { "GET", "HEAD" }, () => Results.Ok(new { status = "ok" }));
 
 app.Run();
 
 [ExcludeFromCodeCoverage]
 public partial class Program { }
-
