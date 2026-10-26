@@ -18,6 +18,13 @@ catch
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configurar Sentry para ASP.NET Core (lee SENTRY_DSN del ambiente)
+builder.WebHost.UseSentry(o =>
+{
+    o.Dsn = builder.Configuration["SENTRY_DSN"] ?? "";
+    o.TracesSampleRate = 1.0;
+});
+
 // Configurar puerto de escucha leyendo de variable PORT (default 3000)
 var portStr = Environment.GetEnvironmentVariable("PORT") ?? "3000";
 if (!int.TryParse(portStr, out var port))
@@ -49,6 +56,7 @@ app.UseCors("AllowAll");
 app.UseAuthorization();
 app.MapControllers();
 app.MapMethods("/health", new[] { "GET", "HEAD" }, () => Results.Ok(new { status = "ok" }));
+app.MapGet("/api/falla", string () => throw new InvalidOperationException("Falla de prueba del TP9"));
 
 app.Run();
 
