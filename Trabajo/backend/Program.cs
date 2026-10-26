@@ -56,7 +56,6 @@ app.UseCors("AllowAll");
 app.UseAuthorization();
 app.MapControllers();
 app.MapMethods("/health", new[] { "GET", "HEAD" }, () => Results.Ok(new { status = "ok" }));
-app.MapGet("/api/falla", string () => throw new InvalidOperationException("Falla de prueba del TP9"));
 
 app.Run();
 
