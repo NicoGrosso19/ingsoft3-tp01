@@ -1,6 +1,28 @@
 # Registro de Decisiones de Arquitectura y DevOps (decisiones.md)
 
-Este documento registra de forma acumulativa y justificada las decisiones técnicas, arquitecturales y de gestión tomadas a lo largo de los Trabajos Prácticos (TP1 a TP4) de la materia **Ingeniería del Software 3 (UCC)**.
+Este documento registra de forma acumulativa y justificada las decisiones técnicas, arquitecturales y de gestión tomadas a lo largo de los Trabajos Prácticos (TP1 a TP9) de la materia **Ingeniería del Software 3 (UCC)**.
+
+---
+
+## 📌 Enlaces Centrales de Entrega (P2: TP5 a TP9)
+
+> **Nota de acceso rápido para evaluación automatizada y defensa oral:** Enlaces directos a los recursos centrales desplegados y verificados en GitHub, GHCR y Render.
+
+| Recurso / Entregable | Descripción | Enlace de Verificación |
+|---|---|---|
+| **API QA (Render)** | Backend en QA conectado a Neon DB (`app_qa`) | [https://ingsoft3-tp01-api-qa-new.onrender.com](https://ingsoft3-tp01-api-qa-new.onrender.com) |
+| **Frontend QA (Render)** | Frontend en QA con Nginx dinámico | [https://ingsoft3-tp01-front-qa.onrender.com](https://ingsoft3-tp01-front-qa.onrender.com) |
+| **API PROD (Render)** | Backend en Producción conectado a Neon DB (`app_prod`) | [https://ingsoft3-tp01-api-prod.onrender.com](https://ingsoft3-tp01-api-prod.onrender.com) |
+| **Frontend PROD (Render)** | Frontend en Producción | [https://ingsoft3-tp01-front-prod.onrender.com](https://ingsoft3-tp01-front-prod.onrender.com) |
+| **Paquete Backend GHCR** | Imagen de backend en GitHub Container Registry (Pública) | [ghcr.io/nicogrosso19/ingsoft3-tp01-backend](https://github.com/NicoGrosso19/ingsoft3-tp01/pkgs/container/ingsoft3-tp01-backend) |
+| **Paquete Frontend GHCR** | Imagen de frontend en GitHub Container Registry (Pública) | [ghcr.io/nicogrosso19/ingsoft3-tp01-frontend](https://github.com/NicoGrosso19/ingsoft3-tp01/pkgs/container/ingsoft3-tp01-frontend) |
+| **TP6: Gate Rechazado** | Corrida con despliegue a PROD rechazado manualmente | [Run Rechazado #36440863748](https://github.com/NicoGrosso19/ingsoft3-tp01/actions/runs/36440863748) |
+| **TP6: Gate Aprobado** | Corrida con despliegue a PROD aprobado y smoke test OK | [Run Aprobado #36445891650](https://github.com/NicoGrosso19/ingsoft3-tp01/actions/runs/36445891650) |
+| **TP7: Integración Verde + E2E Roja** | Corrida con fallo E2E que frenó la promoción a PROD | [Run Par Verde/Rojo #38500367544](https://github.com/NicoGrosso19/ingsoft3-tp01/actions/runs/38500367544) |
+| **TP7: Corrida Completa en Verde** | Corrida completa con tests pasando y deploy a PROD | [Run Aprobado #38501988923](https://github.com/NicoGrosso19/ingsoft3-tp01/actions/runs/38501988923) |
+| **TP5: PR Frenado por Umbral** | PR con falta de tests mantenido abierto y en rojo | [Pull Request #21](https://github.com/NicoGrosso19/ingsoft3-tp01/pull/21) |
+| **TP9: PR Dependabot Mergeado** | PR #45: `Bump DotNetEnv from 3.1.1 to 3.2.0` con CI verde | [Pull Request #45](https://github.com/NicoGrosso19/ingsoft3-tp01/pull/45) |
+| **Releases Oficiales** | Entregas congeladas desde v1.0.0 a v9.0.0 | [Releases del Repositorio](https://github.com/NicoGrosso19/ingsoft3-tp01/releases) |
 
 ---
 
@@ -200,7 +222,13 @@ Se excluyeron de la medición aquellas piezas sin lógica de negocio propia medi
 | **Pull Request #1 (Mergeado)** | Secuencia completa: PR abierto $\to$ Fallo de Quality Gate en rojo $\to$ Agregado de tests $\to$ Paso a verde $\to$ Merge a `main`. | [Ver Pull Request #20](https://github.com/NicoGrosso19/ingsoft3-tp01/pull/20) |
 | **Pull Request #2 (Abierto y en Rojo)** | PR chiquito con función `calcularDescuentoPorAnticipacion` sin tests, mantenido abierto en rojo para la defensa oral. | [Ver Pull Request #21](https://github.com/NicoGrosso19/ingsoft3-tp01/pull/21) |
 
-### 8. Declaración de Uso de Inteligencia Artificial
+### 8. Problemas Encontrados y Cómo se Resolvieron
+* **Problema 1 (Cálculo distorsionado de cobertura por inclusión de código de arranque):** Inicialmente, Coverlet medía clases sin lógica de dominio como `Program.cs`, controladores delgados y DTOs, diluyendo la cobertura real de las reglas de negocio.
+  - *Resolución:* Se aplicó el atributo `[ExcludeFromCodeCoverage]` sobre las clases de infraestructura y transporte HTTP, focalizando el umbral de xUnit estrictamente en la lógica crítica de `ReservationService.cs`.
+* **Problema 2 (Aislamiento de lógica en Frontend):** Testear validaciones y cálculos condicionales directamente sobre componentes JSX en Vitest generaba dependencia de entornos DOM simulados lentos.
+  - *Resolución:* Se extrajo la lógica pura a `src/lib/reservas.js`, permitiendo suites de pruebas unitarias ultra veloces y deterministas que garantizan el cumplimiento del umbral del 80% de líneas y ramas.
+
+### 9. Declaración de Uso de Inteligencia Artificial
 * **Uso de IA:** Se utilizó asistencia de IA (Antigravity / Gemini) para estructurar los proyectos de prueba xUnit y Vitest, diseñar las matrices de casos parametrizados de las reglas R1 a R6, y configurar los reporters de cobertura en GitHub Actions.
 * **Verificación humana:** Se ejecutaron los tests localmente, se comprobaron las salidas visuales de ReportGenerator en navegador, se auditó el bloqueo efectivo del botón de merge en los Pull Requests de GitHub y se validó el pase a verde tras la incorporación de los tests faltantes.
 
