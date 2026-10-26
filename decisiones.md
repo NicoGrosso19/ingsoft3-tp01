@@ -509,3 +509,76 @@ El resultado en la corrida **#38500367544** demostró el poder de diagnóstico d
 ### 4. Declaración de Uso de Inteligencia Artificial
 * **Uso de IA:** Se utilizó asistencia de IA (Antigravity / Gemini) para estructurar el código HCL modular de Terraform (`infra/main.tf`, `infra/variables.tf`, `infra/outputs.tf`), depurar las llamadas de introspección a las APIs de Neon y Render para la resolución de IDs de organización y equipo, y documentar el análisis del ciclo de vida y drift.
 * **Verificación humana:** Se ejecutó localmente el flujo completo de Terraform (`init`, `fmt`, `validate`, `plan`, `apply`, `destroy`), se comprobaron las respuestas de los endpoints `/health` y `/api/reservations` en preprod, se provocó y validó la recuperación de drift manual en Neon, y se verificó que los entornos preexistentes de QA y Producción no sufrieran alteraciones.
+
+---
+
+## ## TP9 — DevSecOps + Observabilidad + Continuous Feedback
+
+### 1. Enlaces y Entregables del TP9
+
+| Recurso / Guardián | Descripción | Enlace / Estado de Verificación |
+|---|---|---|
+| **Dependabot (SCA)** | Configurado en `.github/dependabot.yml` para `nuget`, `npm` y `github-actions` | [`.github/dependabot.yml`](.github/dependabot.yml) |
+| **Pull Request Dependabot Mergeado** | PR #45: `Bump DotNetEnv from 3.1.1 to 3.2.0` verificado con CI verde | [Ver Pull Request #45](https://github.com/NicoGrosso19/ingsoft3-tp01/pull/45) |
+| **CodeQL (SAST)** | Análisis estático de código activo con default setup en GitHub Actions | [Security / Code scanning](https://github.com/NicoGrosso19/ingsoft3-tp01/security/code-scanning) |
+| **Secret Scanning & Push Protection** | Protección activa bloqueando push de credenciales y PATs al repo | Verificado en *Settings → Code security and analysis* |
+| **Monitor Externo (UptimeRobot)** | Sondeo HTTP HEAD cada 5 min sobre `/health` de Producción (Actualmente en pausa) | `https://ingsoft3-tp01-api-prod.onrender.com/health` |
+| **Observabilidad (Sentry)** | Instrumentación en backend (`Sentry.AspNetCore`) y frontend (`@sentry/react`) | Org Sentry: `ucc-1h` |
+| **Tarjeta en Tablero TP3** | Ítem creado a partir de métricas de latencia de producción observadas | [Tablero GitHub Projects](https://github.com/users/NicoGrosso19/projects/1) |
+| **Release de Cierre v9.0.0** | Etiqueta y release formal de cierre del TP9 y la materia | [Release v9.0.0](https://github.com/NicoGrosso19/ingsoft3-tp01/releases/tag/v9.0.0) |
+
+---
+
+### 2. Análisis del Pull Request de Dependabot Mergeado
+
+* **Pull Request Seleccionado:** [PR #45: Bump DotNetEnv from 3.1.1 to 3.2.0](https://github.com/NicoGrosso19/ingsoft3-tp01/pull/45).
+* **Qué actualizaba:** Actualizó la biblioteca `DotNetEnv` del backend (`Trabajo/backend/SistemaReservasBackend.csproj`) de la versión `3.1.1` a la versión `3.2.0`. Siguiendo la especificación de SemVer (Semantic Versioning), el salto de versión corresponde a un incremento *Minor* ($3.1.1 \to 3.2.0$). El changelog de la release incorporó una migración del motor de parsing a Superpower, soporte robusto de codificación UTF-8 e interpolación de variables de entorno, manteniendo estricta compatibilidad hacia atrás en la API pública.
+* **Por qué nos animamos a mergearlo:**
+  1. **Red de seguridad completa del semestre:** Toda la suite de integración continua (CI) en GitHub Actions ejecutó y aprobó los jobs de compilación y pruebas unitarias (`build-backend` y `build-frontend`).
+  2. **Calidad y Cobertura:** Los 19 tests unitarios de xUnit pasaron en verde, superando holgadamente el umbral de cobertura del 80% exigido por el Quality Gate implementado en el TP5.
+  3. **Ausencia de Breaking Changes:** Al tratarse de un cambio *Minor* sin rupturas de contrato, se contó con total confianza técnica para realizar el squash & merge directamente sobre `main`.
+
+---
+
+### 3. Métricas de Observabilidad y Continuous Feedback
+
+#### A. Monitoreo Externo con UptimeRobot
+* **Configuración:** Monitor de disponibilidad HTTP(S) apuntando al endpoint de salud público de producción `https://ingsoft3-tp01-api-prod.onrender.com/health`, configurado a intervalos de 5 minutos y alertas automáticas vía email.
+* **Tiempo de Detección de Caída:**
+  - **Detección de DOWN:** Tras suspender intencionalmente el servicio web de la API en Render, el monitor tardó **5 minutos** en disparar la alerta por correo electrónico (el intervalo mínimo de sondeo de la capa gratuita).
+  - **Detección de UP:** Al reactivar el servicio, la notificación de recuperación llegó a los **8 minutos**, reflejando el tiempo necesario para el cold start y el aprovisionamiento del contenedor.
+* **Política Operativa de Ahorro:** Finalizada la verificación de las alertas, el monitor fue puesto en **Pause** para evitar agotar las 750 horas mensuales compartidas entre servicios en Render.
+
+#### B. Telemetría y Rendimiento en Sentry
+* **Instrumentación:**
+  - **Backend:** `Sentry.AspNetCore` configurado con `TracesSampleRate = 1.0` y lectura segura del DSN desde la variable de entorno `SENTRY_DSN` en Render (sin exponer credenciales de ingesta en el código fuente).
+  - **Frontend:** `@sentry/react` inicializado con `browserTracingIntegration()` y `tracesSampleRate: 1.0` en `main.jsx`.
+* **Datos Reales Medidos en Producción:**
+  - **Operación más usada:** `GET /api/reservations` con un tiempo total acumulado de **980.60 ms** y mayor volumen de invocaciones.
+  - **Operación más lenta:** `GET /api/reservations` registró una latencia de **P95 de 903.46 ms** (frente a un P50 de **2.73 ms**). La diferencia drástica entre P50 y P95 ilustra el costo del primer arranque (*cold start*) de la base de datos en Neon. En segundo lugar, `POST /api/reservations` registró un P95 de **211.23 ms** (P50 de 138.90 ms).
+  - **Frontend:** La carga inicial (`Pageload`) en `ingsoft3-tp01-front-prod.onrender.com` registró un tiempo de **1.30s**, con una calificación de rendimiento de **94 (Good)** en Sentry.
+* **Captura de Errores y Cierre de Ciclo:**
+  - Se verificó la captura del endpoint de prueba `/api/falla` en la sección *Issues* de Sentry (`InvalidOperationException: Falla de prueba del TP9 para verificar captura en Sentry.`), retirándolo inmediatamente después de la validación.
+  - **Tarjeta en GitHub Projects (TP3):** Se cerró el feedback loop de DevSecOps abriendo la tarjeta *«Optimizar latencia de cold start y reconexión front-back en producción»* en el tablero de trabajo, transformando las señales de observabilidad de producción en backlog accionable para el siguiente ciclo de desarrollo.
+
+---
+
+### 4. Problemas Encontrados y Cómo se Resolvieron
+
+1. **Rechazo de Métodos HTTP HEAD en el Endpoint de Salud (`/health`):**
+   - *Problema:* El plan gratuito de UptimeRobot utiliza por defecto el método HTTP `HEAD` para verificar disponibilidad sin descargar el body. ASP.NET Core mapeaba `/health` únicamente mediante `app.MapGet`, respondiendo con HTTP `405 Method Not Allowed` y haciendo que el monitor marcara erróneamente la aplicación como DOWN.
+   - *Resolución:* Se modificó la declaración en `Trabajo/backend/Program.cs` por `app.MapMethods("/health", new[] { "GET", "HEAD" }, ...)`. El cambio se integró a `main` y se desplegó por el pipeline a producción, restableciendo la respuesta HTTP 200 OK tanto para GET como para HEAD.
+
+2. **Advertencia de Validación en `dependabot.yml`:**
+   - *Problema:* El archivo de configuración de Dependabot fue colocado inicialmente dentro de `.github/workflows/`, lo cual provocaba errores de validación de sintaxis en el IDE al intentar interpretarlo como un flujo de trabajo de GitHub Actions.
+   - *Resolución:* Se trasladó a su ruta estándar `.github/dependabot.yml`, permitiendo que GitHub detectara los tres ecosistemas (`nuget`, `npm` y `github-actions`) y abriera de forma automática las solicitudes de extracción de actualización.
+
+3. **Bloqueo por Concurrencia en Despliegue de Producción:**
+   - *Problema:* El job `deploy-prod` permanecía en estado de espera indefinido debido a que una corrida previa de GitHub Actions había quedado pendiente de aprobación en el entorno `production`, reteniendo el lock del grupo de concurrencia.
+   - *Resolución:* Se canceló la corrida obsoleta mediante GitHub CLI (`gh run cancel`), permitiendo la aprobación inmediata y el despliegue de las nuevas imágenes con telemetría a producción.
+
+---
+
+### 5. Declaración de Uso de Inteligencia Artificial
+* **Uso de IA:** Se utilizó asistencia de IA (Antigravity / Gemini) para diseñar la configuración de los paquetes de Sentry en .NET 8 y React, estructurar el monitor externo y los endpoints compatibles con HEAD, diagnosticar los bloqueos de concurrencia en GitHub Actions y redactar las métricas de latencia observadas.
+* **Verificación humana:** Se ejecutaron y verificaron localmente las suites de tests (19 tests de backend y 15 de frontend en verde), se auditó el panel de control de Sentry confirmando la recepción de eventos de error y trazas de rendimiento, se comprobaron las alertas de correo enviadas por UptimeRobot, se gestionó la aprobación manual del gate a producción y se mergeó el PR de Dependabot con todas las validaciones de CI en verde.
